@@ -1,0 +1,323 @@
+import mutagen
+from mutagen.easyid3 import EasyID3
+from mutagen.easymp4 import EasyMP4
+import shutil
+from pathlib import Path
+import os
+import enum
+import logging
+
+from spotify_searcher import SpotifySearcher, Track
+from audio_fingerprinter import Fingerprinter, FingerprintResult
+
+INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", "."]
+logging.getLogger('__main__.' + __name__)
+logging.propagate = True
+
+
+class Tagger:
+    """
+    Wrapper class for mutagen objects, to provide consistent api for any filetype
+    Take care to only use valid tags for each type
+    """
+    def __init__(self, file: Path):
+        extension = file.suffix
+        if extension.lower() == ".mp3":
+            self.tagger = EasyID3(file)
+        elif extension.lower() == ".m4a":
+            self.tagger = EasyMP4(file)
+        else:
+            logging.warning(f"{file} has invalid extension {extension}")
+            raise ValueError("Invalid Extension")
+
+    def get(self, key, value=None):
+        return self.tagger.get(key, value)
+
+    def __getitem__(self, item):
+        return self.tagger.__getitem__(item)
+
+    def __setitem__(self, key, value):
+        self.tagger.__setitem__(key, value)
+
+    def save(self):
+        self.tagger.save()
+
+
+class TagType(enum.Enum):
+    SPOTIFY = 0
+    FINGERPRINTER = 1
+    METADATA = 2
+
+
+class MPORG:
+
+    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinter, use_fingerprinter):
+        self.search = search
+        self.store = store
+        self.sh = searcher
+        self.af = fingerprinter
+        self.fingerprint = use_fingerprinter
+        # Register tags not initial
+        EasyID3.RegisterTextKey("comment", "COMM")
+        EasyID3.RegisterTextKey("initialkey", "TKEY")
+        EasyID3.RegisterTextKey("source", "WOAS")
+        EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
+
+    def organize(self):
+        """
+        Iterate Over files in search directory, Then Create needed dirs in store
+        Then copy the files to the correct dir
+        :return:
+        """
+        logging.info('Organizing files...')
+        for root, subdirs, files in os.walk(self.search):
+            for file in files:
+                try:
+                    path = Path(root) / file
+                    metadata = Tagger(path)
+                    ext = file.split('.')[-1]
+                    results, tags_from = self.get_metadata(metadata, path)
+
+                    location = self.get_location(results, tags_from, metadata, ext, file)
+
+                    self.copy_file(path, location)
+
+                    logging.info(f"Saving tags for {location}")
+                    if tags_from == TagType.SPOTIFY:
+                        self.update_metadata_from_spotify(location, results)
+                    elif tags_from == TagType.FINGERPRINTER:
+                        self.update_metadata_from_fingerprinter(location, results)
+                    # If Via METADATA The act of copying the file also saves the tags
+                except ValueError as e:
+                    logging.error(f"Error processing file {file}: {e}")
+        logging.info('Organizing files finished.')
+
+    def get_metadata(self, metadata: Tagger, file: Path):
+        """
+        Try to get metadata from Spotify, Audio Fingerprinting, or fall back to metadata provided by the file
+        :param metadata: tagger object with original metadata of file
+        :param file: Path of origin file
+        :return: Tuple of metadata results and the source of the metadata
+        """
+        artist = metadata.get('artist')
+        title = metadata.get('title')
+        logging.info(f"Attempting to get metadata for {title} by {artist}")
+        spotify_results = self.search_spotify(title, artist)
+        if spotify_results:
+            logging.info(f"Metadata found on Spotify for {title} by {artist}")
+            logging.debug(spotify_results)
+            return spotify_results, TagType.SPOTIFY
+        if self.fingerprint:
+            fingerprint_results = self.get_fingerprint_metadata(file)
+            if fingerprint_results:
+                if fingerprint_results.type == "spotify":
+                    spotify_results = self.get_fingerprint_spotify_metadata(fingerprint_results.results.get("spotifyid"))
+                    if spotify_results:
+                        logging.info(f"Metadata found using audio fingerprinting and Spotify for ID:"
+                                     f" {fingerprint_results.results.get('spotifyid')}")
+                        logging.debug(spotify_results)
+                        return spotify_results, TagType.SPOTIFY
+                else:
+                    logging.info(f"Metadata found using audio fingerprinting: {fingerprint_results.results.track_name}"
+                                 f" by {fingerprint_results.results.track_artists}")
+                    logging.debug(fingerprint_results.results)
+                    return fingerprint_results.results, TagType.FINGERPRINTER
+        logging.info(f"No Metadata found for {file}")
+        return None, TagType.METADATA
+
+    def search_spotify(self, title: str, artist: str) -> Track:
+        results = None
+        if title and artist:
+            results = self.sh.search(name="".join(title), artist=artist)
+            logging.info(f"Spotify Results: {results}")
+        return results
+
+    def get_fingerprint_metadata(self, file: Path) -> FingerprintResult | None:
+        results = self.af.fingerprint(file)
+        if results.code == 0:
+            return results
+        return None
+
+    def get_fingerprint_spotify_metadata(self, spotify_id: str) -> Track | None:
+        results = self.sh.search(spot_id=spotify_id)
+        if results:
+            return results
+        return None
+
+    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, ext: str, file: str) -> Path:
+        """
+        Determine the correct location to move the file based on metadata results and source
+        :param file: Filename of original file
+        :param results: Track Object containing Metadata
+        :param tags_from: Source of Tags
+        :param metadata: # Tagger object containing origin file tags
+        :param ext: # Extension of original file
+        :return: The path of the destination file
+        """
+        if tags_from == TagType.SPOTIFY:
+            return self.spotify_location(results, ext)
+        elif tags_from == TagType.FINGERPRINTER:
+            return self.fingerprinter_location(results, ext)
+        elif tags_from == TagType.METADATA:
+            return self.metadata_location(metadata, ext, file)
+
+    def spotify_location(self, results: Track, ext: str) -> Path:
+        album_artist, album_name, track_artist, track_name = _sanitize_results(results)
+
+        return self.store / album_artist / \
+            f"{results.album_year} - {album_name.strip()}" / \
+            f"{results.track_number}. - {track_artist} - {track_name}.{ext}"
+
+    def fingerprinter_location(self, results: Track, ext: str) -> Path:
+        album_artist, album_name, track_artist, track_name = _sanitize_results(results)
+
+        return self.store / album_artist / \
+            (f"{results.track_year} - " + f"{album_name}" if results.track_year else f"{album_name}") / \
+            f"{track_artist} - {track_name}.{ext}"
+
+    def metadata_location(self, metadata: Tagger, file_extension: str, file_name: str) -> Path:
+        title = metadata.get("title")
+        artist = metadata.get("artist")
+        album = metadata.get("album")
+
+        if not all((title, artist, album)):
+            logging.warning(f"Cannot tag '{file_name}' ...")
+            return self.store / "_TaggingImpossible" / file_name
+
+        track_artist = ", ".join(artist).strip()
+        year = "".join(metadata.get('date', "")).strip()
+        album = "".join(metadata.get('album', "")).strip()
+        track = "".join(metadata.get('title', "")).strip()
+        track_num = "".join(metadata.get('tracknumber', ["1"]))
+        artist = [a.replace("/", ", ").strip() for a in metadata.get('artist', [])]
+        # MP4 files get artists as '/' separated strings, split them apart here
+        # If the artist name actually has '/', sorry
+
+        if title and artist and metadata.get('album') and not metadata.get('albumartist'):
+            album_artist = ", ".join(artist).strip()  # Use artist instead
+        else:
+            album_artist = ", ".join(metadata.get('albumartist', [])).strip()
+
+        # Build path using pathlib
+        path = self.store / _remove_invalid_path_chars(album_artist)
+        if year:
+            path /= f"{year} - {_remove_invalid_path_chars(album)}"
+        else:
+            path /= _remove_invalid_path_chars(album)
+
+        parts = []
+        # Build filename
+        if track_num:
+            parts.append(f"{track_num}.")
+        if track_artist and track_artist != "Unknown":
+            parts.append(_remove_invalid_path_chars(track_artist))
+        if track:
+            parts.append(_remove_invalid_path_chars(track))
+
+        path /= f'{" - ".join(parts)}.{file_extension}'
+        return path
+
+    @staticmethod
+    def copy_file(source: Path, destination: Path) -> None:
+        """
+        Copy the file from the source location to the destination location
+        :param source:
+        :param destination:
+        :return:
+        """
+        if not os.path.exists(destination):
+            logging.info(f"Copying {source} to {destination}")
+            try:
+                shutil.copyfile(source, destination)
+            except (OSError, IOError):
+                try:
+                    os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o666)
+                    shutil.copyfile(source, destination)
+                except (OSError, IOError) as e:
+                    logging.exception(e)
+
+    @staticmethod
+    def update_metadata_from_spotify(location: Path, results: Track) -> None:
+        """
+        Update file metadata with Spotify results
+        :param location:
+        :param results:
+        :return:
+        """
+        metadata = Tagger(location)
+        metadata['title'] = results.track_name
+        metadata['artist'] = ";".join(results.track_artists)
+        metadata['album'] = results.album_name
+        metadata['date'] = results.album_year
+        metadata['tracknumber'] = str(results.track_number)
+        metadata['discnumber'] = str(results.track_disk)
+        metadata['comment'] = results.track_url
+        metadata['source'] = results.track_url
+        metadata['albumartist'] = results.album_artists
+        metadata['bpm'] = str(results.track_bpm)
+        metadata['initialkey'] = results.track_key
+        metadata['genre'] = results.album_genres
+        try:
+            metadata.save()
+        except mutagen.MutagenError as e:
+            logging.exception(e)
+
+    @staticmethod
+    def update_metadata_from_fingerprinter(location: Path, results: Track) -> None:
+        metadata = Tagger(location)
+        metadata['title'] = results.track_name
+        metadata['artist'] = ";".join(results.track_artists)
+        metadata['albumartist'] = results.album_artists
+        try:
+            metadata['album'] = results.album_name
+        except ValueError:
+            pass
+        try:
+            metadata['date'] = results.track_year
+        except ValueError:
+            pass
+        try:
+            metadata['genre'] = results.album_genres
+        except ValueError:
+            pass
+        try:
+            metadata.save()
+        except mutagen.MutagenError as e:
+            logging.exception(e)
+
+
+def _remove_invalid_path_chars(s: str) -> str:
+    """Helper function to remove invalid characters from a string."""
+    return ''.join(c for c in s if c not in INVALID_PATH_CHARS)
+
+
+def _sanitize_results(results: Track) -> (str, str, str, str):
+    """
+    # Sanitize the strings and limit the total length of the sanitized results to ~190 characters
+    # to ensure compatibility with both Windows (256-character limit) and Linux (4096-character limit) path lengths.
+    # Leave room for a 66-character root directory.
+    :param results:
+    :return: tuple of sanitized and truncated album_artist, album_name, track_artist, track_name
+    """
+    album_artist = ", ".join(results.album_artists)
+    track_artist = ", ".join(results.track_artists)
+
+    track_artist = _remove_invalid_path_chars(track_artist)[:30].strip()
+    album_artist = _remove_invalid_path_chars(album_artist)[:30].strip()
+
+    album_name = _remove_invalid_path_chars(results.album_name)[:50].strip()
+    track_name = _remove_invalid_path_chars(results.track_name)[:50].strip()
+
+    # Calculate the total length of the sanitized results
+    total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
+
+    # If the total length exceeds 190 characters, truncate the longest string(s)
+    if total_length > 190:
+        while total_length > 190:
+            if len(album_name) > len(track_name):
+                album_name = album_name[:-1].strip()
+            else:
+                track_name = track_name[:-1].strip()
+            total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
+
+    return album_artist, album_name, track_artist, track_name
