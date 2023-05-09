@@ -51,12 +51,11 @@ class TagType(enum.Enum):
 
 class MPORG:
 
-    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinter, use_fingerprinter):
+    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]):
         self.search = search
         self.store = store
         self.sh = searcher
-        self.af = fingerprinter
-        self.fingerprint = use_fingerprinter
+        self.af = fingerprinters
         # Register tags not initial
         EasyID3.RegisterTextKey("comment", "COMM")
         EasyID3.RegisterTextKey("initialkey", "TKEY")
@@ -107,7 +106,7 @@ class MPORG:
             logging.info(f"Metadata found on Spotify for {title} by {artist}")
             logging.debug(spotify_results)
             return spotify_results, TagType.SPOTIFY
-        if self.fingerprint:
+        if self.af:
             fingerprint_results = self.get_fingerprint_metadata(file)
             if fingerprint_results:
                 if fingerprint_results.type == "spotify":
@@ -122,6 +121,9 @@ class MPORG:
                                  f" by {fingerprint_results.results.track_artists}")
                     logging.debug(fingerprint_results.results)
                     return fingerprint_results.results, TagType.FINGERPRINTER
+        else:
+            logging.debug("No Fingerprinters provided. Fingerprinting disabled")
+
         logging.info(f"No Metadata found for {file}")
         return None, TagType.METADATA
 
@@ -133,9 +135,10 @@ class MPORG:
         return results
 
     def get_fingerprint_metadata(self, file: Path) -> FingerprintResult | None:
-        results = self.af.fingerprint(file)
-        if results.code == 0:
-            return results
+        for fingerprinter in self.af:
+            results = fingerprinter.fingerprint(file)
+            if results.code == 0:
+                return results
         return None
 
     def get_fingerprint_spotify_metadata(self, spotify_id: str) -> Track | None:

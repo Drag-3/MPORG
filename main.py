@@ -9,6 +9,8 @@ from spotify_searcher import SpotifySearcher, SpotifyOauthError
 from organizer import MPORG
 import logging
 from logging.handlers import RotatingFileHandler
+import validators
+
 
 
 def get_credentials(save_file):
@@ -84,7 +86,7 @@ def set_logging(v: bool):
 
     # Create a console handler and set the formatter
     console_handler = ColorHandler()
-    console_handler.setLevel(logging.DEBUG if v else logging.INFO)
+    console_handler.setLevel(logging.DEBUG if v else logging.WARNING)
     console_handler.setFormatter(c_formatter)
 
     # Add both handlers to the logger
@@ -99,19 +101,19 @@ def get_credentials(use_acr: bool = False, use_mb: bool = False):
     acrcloud_path = config_folder / "acrcloud.json"
     acoustid_path = config_folder / "acoustid.json"
 
-    if not os.path.exists(config_folder):
+    if not config_folder.exists():
         os.mkdir(config_folder)
         logging.debug(f"Creating {config_folder}")
 
-    if not os.path.exists(credential_path):
+    if not credential_path.exists():
         credential_path.touch(0o666)
         logging.debug(f"Creating {credential_path}")
 
-    if not os.path.exists(acrcloud_path):
+    if not acrcloud_path.exists():
         acrcloud_path.touch(0o666)
         logging.debug(f"Creating {acrcloud_path}")
 
-    if not os.path.exists(acoustid_path):
+    if not acoustid_path.exists():
         acoustid_path.touch(0o666)
         logging.debug(f"Creating {acoustid_path}")
 
@@ -146,28 +148,83 @@ def get_credentials(use_acr: bool = False, use_mb: bool = False):
 
 
 def get_acoustid_credentials(cred):
-    api_key = input("Enter your acoustID API Key: ")
+    print("Getting AcoustID Credentials. Enter q to skip this fingerprinter..")
+    while True:
+        api_key = input("Enter your AcoustID API Key: ")
+        if api_key.lower() == "q":
+            return None
+        elif len(api_key) > 0:
+            break
+        else:
+            print("Invalid access key. Please try again.")
+
     data = {"api": api_key}
-    json.dump(data, cred)
+
+    try:
+        cred.seek(0)
+        cred.truncate()
+        json.dump(data, cred)
+    except Exception as e:
+        logging.exception(f"Error writing to file: {e}")
+
     return data
 
 
 def get_spotify_credentials(cred):
     # Ask user for Spotify credentials
+    print("Getting Spotify Credentials.")
+
     cid = input("Enter your Spotify Client ID: ")
     secret = input("Enter your Spotify Client Secret: ")
     data = {"cid": cid, "secret": secret}
-    json.dump(data, cred)
+
+    try:
+        cred.seek(0)
+        cred.truncate()
+        json.dump(data, cred)
+    except Exception as e:
+        logging.exception(f"Error writing to file: {e}")
     return data
 
 
 def get_acrcloud_credentials(acrcred):
     # Ask user for ACRCloud credentials
-    host = input("Enter the ACRCloud host: ")
-    key = input("Enter your ACRCloud access key: ")
-    secret = input("Enter your ACRCloud access secret: ")
+    print("Getting ACRCloud Credentials. Enter q to skip this fingerprinter..")
+    while True:
+        host = input("Enter the ACRCloud host: ")
+        if host.lower() == "q":
+            return None
+        elif validators.url(host):
+            break
+        else:
+            print("Invalid URL. Please try again.")
+
+    while True:
+        key = input("Enter your ACRCloud access key: ")
+        if key.lower() == "q":
+            return None
+        elif len(key) > 0:
+            break
+        else:
+            print("Invalid access key. Please try again.")
+
+    while True:
+        secret = input("Enter your ACRCloud access secret: ")
+        if secret.lower() == "q":
+            return None
+        elif len(secret) > 0:
+            break
+        else:
+            print("Invalid access secret. Please try again.")
+
     data = {"host": host, "key": key, "secret": secret, "debug": False, "timeout": 10}
-    json.dump(data, acrcred)
+    try:
+        acrcred.seek(0)
+        acrcred.truncate()
+        json.dump(data, acrcred)
+    except Exception as e:
+        logging.exception(f"Error writing to file: {e}")
+
     return data
 
 
@@ -177,9 +234,11 @@ def main():
     arg_parser.add_argument("-V", "--verbose", help="Print", action="store_true")
     arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud", action="store_true")
     arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz", action="store_true")
-    arg_parser.add_argument("-f", "--fingerprint", help="Fingerprinting. (use with [-a, -m])", action="store_true")
-    arg_parser.add_argument("store_path", help="Root of area to store organized files")
-    arg_parser.add_argument("search_path", help="Source dir to look for mp3 files in. Is not recursive")
+    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters. (Same as -am)", action="store_true")
+
+    arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
+                            help="Root of area to store organized files")
+    arg_parser.add_argument("search_path", default=Path.cwd(),  help="Source dir to look for mp3 files in.")
 
     args = arg_parser.parse_args()
     set_logging(args.verbose)
@@ -189,18 +248,19 @@ def main():
         print("V.0.1.0.1.1.0")
         sys.exit(0)
 
-    spotify_creds, acrcloud_creds, mbid = get_credentials(use_acr=args.acrcloud, use_mb=args.music_brainz)
+    spotify_creds, acrcloud_creds, mbid = get_credentials(use_acr=args.acrcloud or args.fingerprint,
+                                                          use_mb=args.music_brainz or args.fingerprint)
     spotify_searcher = SpotifySearcher(spotify_creds["cid"], spotify_creds["secret"])
 
-    if args.acrcloud:
-        fingerprinter = ACRFingerprinter(acrcloud_creds)
-    elif args.music_brainz:
-        fingerprinter = MBFingerprinter(mbid)
-    else:
-        fingerprinter = None
+    fingerprinters = []
+    if args.acrcloud or args.fingerprint:
+        fingerprinters.append(ACRFingerprinter(acrcloud_creds))
+    if args.music_brainz or args.fingerprint:
+        fingerprinters.append(MBFingerprinter(mbid))
+
 
     logging.info("All good, starting Organizing")
-    org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinter, args.fingerprint)
+    org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinters)
     org.organize()
 
 
