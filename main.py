@@ -217,7 +217,7 @@ def get_acrcloud_credentials(acrcred):
         else:
             print("Invalid access secret. Please try again.")
 
-    data = {"host": host, "key": key, "secret": secret, "debug": False, "timeout": 10}
+    data = {"host": host, "access_key": key, "access_secret": secret, "debug": False, "timeout": 10}
     try:
         acrcred.seek(0)
         acrcred.truncate()

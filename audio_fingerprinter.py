@@ -1,7 +1,7 @@
 import os
 
 import musicbrainzngs
-from acrcloud import ACRcloud
+from acrcloud.recognizer import ACRCloudRecognizer
 from acoustid import fingerprint_file, lookup
 from abc import abstractmethod
 from pathlib import Path
@@ -24,7 +24,7 @@ class Fingerprinter:
 
 class ACRFingerprinter(Fingerprinter):
     def __init__(self, config):
-        self.acrcloud = ACRcloud(config)
+        self.acrcloud = ACRCloudRecognizer(config)
         self.cache = diskcache.Cache(directory=str(Path(os.getcwd()) / "audiocache_A"))
 
     def fingerprint(self, path_to_fingerprint: Path) -> 'FingerprintResult':
@@ -35,12 +35,18 @@ class ACRFingerprinter(Fingerprinter):
             return cached_result
         try:
             logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
-            result = self.acrcloud.recognizer(path_to_fingerprint)
+            result = self.acrcloud.recognize_by_file(path_to_fingerprint, rec_length=30)
         except Exception as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
             return FingerprintResult(code="error", type="fail")
 
         out = FingerprintResult()
+        if not isinstance(result, dict):
+            logging.critical(f"Invalid Response. Not of dict {result} for ||| {path_to_fingerprint}")
+            out.code = 999
+            out.type = "fail"
+            return out
+
         out.code = result['status']['code']
         if out.code != 0:
             logging.info(f"Fingerprint request returned code {out.code}")
