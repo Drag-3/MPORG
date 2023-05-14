@@ -1,32 +1,15 @@
+import logging
 import os
 import sys
-from argparse import ArgumentParser
+from logging.handlers import RotatingFileHandler
 import json
+from argparse import ArgumentParser
 from pathlib import Path
 
-from audio_fingerprinter import ACRFingerprinter, MBFingerprinter
-from spotify_searcher import SpotifySearcher, SpotifyOauthError
-from organizer import MPORG
-import logging
-from logging.handlers import RotatingFileHandler
-import validators
-
-
-
-def get_credentials(save_file):
-    cid = input("Enter Spotify Client ID: ")
-
-    secret = input("Enter Spotify Client Secret: ")
-    creds = {"cid": cid,
-             "secret": secret}
-
-    save_file.seek(0)
-    save_file.truncate()  # Erase old data
-
-    json.dump(creds, save_file)
-    save_file.flush()
-
-    return creds
+from mporg import CONFIG_DIR, VERSION
+from mporg.organizer import MPORG
+from mporg.audio_fingerprinter import ACRFingerprinter, MBFingerprinter
+from mporg.spotify_searcher import SpotifySearcher
 
 
 class ColoredFormatter(logging.Formatter):
@@ -95,15 +78,13 @@ def set_logging(v: bool):
 
 
 def get_credentials(use_acr: bool = False, use_mb: bool = False):
-    usr_home = Path.home()
-    config_folder = usr_home / ".MP3ORG"
-    credential_path = config_folder / "credentials.json"
-    acrcloud_path = config_folder / "acrcloud.json"
-    acoustid_path = config_folder / "acoustid.json"
+    credential_path = CONFIG_DIR / "credentials.json"
+    acrcloud_path = CONFIG_DIR / "acrcloud.json"
+    acoustid_path = CONFIG_DIR / "acoustid.json"
 
-    if not config_folder.exists():
-        os.mkdir(config_folder)
-        logging.debug(f"Creating {config_folder}")
+    if not CONFIG_DIR.exists():
+        os.mkdir(CONFIG_DIR)
+        logging.debug(f"Creating {CONFIG_DIR}")
 
     if not credential_path.exists():
         credential_path.touch(0o666)
@@ -194,7 +175,7 @@ def get_acrcloud_credentials(acrcred):
         host = input("Enter the ACRCloud host: ")
         if host.lower() == "q":
             return None
-        elif validators.url(host):
+        elif ".acrcloud.com" in host:
             break
         else:
             print("Invalid URL. Please try again.")
@@ -217,7 +198,8 @@ def get_acrcloud_credentials(acrcred):
         else:
             print("Invalid access secret. Please try again.")
 
-    data = {"host": host, "access_key": key, "access_secret": secret, "debug": False, "timeout": 10}
+    data = {"host": host, "key": key, "access_key": key, "access_secret": secret, "secret": secret, "debug": False,
+            "timeout": 10}
     try:
         acrcred.seek(0)
         acrcred.truncate()
@@ -238,14 +220,14 @@ def main():
 
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
                             help="Root of area to store organized files")
-    arg_parser.add_argument("search_path", default=Path.cwd(),  help="Source dir to look for mp3 files in.")
+    arg_parser.add_argument("search_path", default=Path.cwd(), help="Source dir to look for mp3 files in.")
 
     args = arg_parser.parse_args()
     set_logging(args.verbose)
     logging.debug(args)
 
     if args.version:
-        print("V.0.1.0.1.1.0")
+        print(VERSION)
         sys.exit(0)
 
     spotify_creds, acrcloud_creds, mbid = get_credentials(use_acr=args.acrcloud or args.fingerprint,
@@ -257,7 +239,6 @@ def main():
         fingerprinters.append(ACRFingerprinter(acrcloud_creds))
     if args.music_brainz or args.fingerprint:
         fingerprinters.append(MBFingerprinter(mbid))
-
 
     logging.info("All good, starting Organizing")
     org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinters)

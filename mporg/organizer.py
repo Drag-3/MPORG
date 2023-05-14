@@ -1,16 +1,18 @@
+import enum
+import logging
+import os
+from pathlib import Path
+import shutil
+
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4
-import shutil
-from pathlib import Path
-import os
-import enum
-import logging
 
-from spotify_searcher import SpotifySearcher, Track
-from audio_fingerprinter import Fingerprinter, FingerprintResult
+from mporg.spotify_searcher import SpotifySearcher, Track
+from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 
-INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", "."]
+
+INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
 logging.getLogger('__main__.' + __name__)
 logging.propagate = True
 
@@ -60,6 +62,7 @@ class MPORG:
         EasyID3.RegisterTextKey("comment", "COMM")
         EasyID3.RegisterTextKey("initialkey", "TKEY")
         EasyID3.RegisterTextKey("source", "WOAS")
+        EasyMP4.RegisterTextKey("source", "source")
         EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
 
     def organize(self):
@@ -98,8 +101,13 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        artist = metadata.get('artist')
-        title = metadata.get('title')
+        artist = [u.replace('\x00', '') for u in metadata.get('artist', '')]  # Rplace Null Bytes
+        title = [u.replace('\x00', '') for u in metadata.get('title', '')]
+        if len(artist) == 1:
+            artist = "".join(artist)
+        if len(title) == 1:
+            title = "".join(title)
+
         logging.info(f"Attempting to get metadata for {title} by {artist}")
         spotify_results = self.search_spotify(title, artist)
         if spotify_results:
@@ -204,14 +212,20 @@ class MPORG:
         # Build path using pathlib
         path = self.store / _remove_invalid_path_chars(album_artist)
         if year:
-            path /= f"{year} - {_remove_invalid_path_chars(album)}"
+            if isinstance(year, str):
+                path /= f"{_remove_invalid_path_chars(year)} - {_remove_invalid_path_chars(album)}"
+            else:
+                path /= f"{year} - {_remove_invalid_path_chars(album)}"
         else:
             path /= _remove_invalid_path_chars(album)
 
         parts = []
         # Build filename
         if track_num:
-            parts.append(f"{track_num}.")
+            if isinstance(track_num, str):  # Prob in form num / total so remove the /total
+                parts.append(f"{int(_remove_invalid_path_chars(track_num.split('/')[0]))}")
+            else:
+                parts.append(f"{track_num}.")
         if track_artist and track_artist != "Unknown":
             parts.append(_remove_invalid_path_chars(track_artist))
         if track:
@@ -257,8 +271,11 @@ class MPORG:
         metadata['comment'] = results.track_url
         metadata['source'] = results.track_url
         metadata['albumartist'] = results.album_artists
-        metadata['bpm'] = str(results.track_bpm)
-        metadata['initialkey'] = results.track_key
+        metadata['bpm'] = str(int(results.track_bpm))
+        try:
+            metadata['initialkey'] = results.track_key
+        except TypeError:
+            pass
         metadata['genre'] = results.album_genres
         try:
             metadata.save()

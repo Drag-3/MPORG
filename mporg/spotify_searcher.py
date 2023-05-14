@@ -1,10 +1,10 @@
-import os
+import logging
+from dataclasses import dataclass
 
+import diskcache
 import spotipy as sy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOauthError
-from dataclasses import dataclass
-import logging
-import diskcache
+from mporg import CONFIG_DIR
 
 PITCH_CODES = {
     0: 'C',
@@ -23,6 +23,7 @@ PITCH_CODES = {
 
 logging.getLogger('__main.' + __name__)
 logging.propagate = True
+
 
 @dataclass
 class Track:
@@ -44,13 +45,15 @@ class Track:
 
 
 class SpotifySearcher:
-    def __init__(self, cid, secret):
+    def __init__(self, cid: str, secret: str):
         try:
-            self.client_cred = SpotifyClientCredentials(client_id=cid, client_secret=secret)
+            auth_path = CONFIG_DIR / ".sp_auth_cache"
+            auth_cache = sy.CacheFileHandler(auth_path)
+            self.client_cred = SpotifyClientCredentials(client_id=cid, client_secret=secret, cache_handler=auth_cache)
             self.spot = sy.Spotify(auth_manager=self.client_cred, requests_timeout=45, retries=5)
 
             self.spot.user_playlists("spotify")  # Check if credentials are sufficient
-            self.cache = diskcache.Cache(directory=os.getcwd() + r"\spotifycache")
+            self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "spotifycache"))
             self.cache.expire(60 * 60 * 12)  # Set the cache to expire in 12 hours
         except SpotifyOauthError as e:
             logging.exception(e)
@@ -75,7 +78,7 @@ class SpotifySearcher:
 
         # Refine the search query to include only tracks that match the artist name and track name
         logging.debug("Searching with Track name and artist")
-        query = f"artist:{artist} track:{name}"
+        query = f"artist:{artist[0]} track:{name}"
         results = self.spot.search(q=query, type="track", limit=50)
 
         # Check each result to see if it matches the search criteria
@@ -91,10 +94,10 @@ class SpotifySearcher:
         return None
 
     @staticmethod
-    def _check_item_match(item, name, artist):
+    def _check_item_match(item: dict, name: str | list, artist: str | list) -> bool:
         if item["name"].lower() == name.lower():
             if isinstance(artist, str):
-                if any(artist.lower() == a["name"].lower() for a in item["artists"]):
+                if any(artist.lower() in a["name"].lower() for a in item["artists"]):
                     return True
             elif isinstance(artist, list):
                 if all(a["name"].lower() in artist for a in item["artists"]):
