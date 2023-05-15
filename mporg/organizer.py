@@ -3,6 +3,9 @@ import logging
 import os
 from pathlib import Path
 import shutil
+from multiprocessing import Pool
+
+from tqdm import tqdm
 
 import mutagen
 from mutagen.easyid3 import EasyID3
@@ -12,7 +15,6 @@ from mutagen.asf import ASF
 
 from mporg.spotify_searcher import SpotifySearcher, Track
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
-
 
 INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
 logging.getLogger('__main__.' + __name__)
@@ -24,6 +26,7 @@ class Tagger:
     Wrapper class for mutagen objects, to provide consistent api for any filetype
     Take care to only use valid tags for each type
     """
+
     def __init__(self, file: Path):
         extension = file.suffix
         if extension.lower() == ".mp3":
@@ -71,34 +74,57 @@ class MPORG:
         EasyMP4.RegisterTextKey("source", "source")
         EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
 
-    def organize(self):
-        """
-        Iterate Over files in search directory, Then Create needed dirs in store
-        Then copy the files to the correct dir
-        :return:
-        """
-        logging.info('Organizing files...')
-        for root, subdirs, files in os.walk(self.search):
+    def get_file_count(self, path):
+        file_count = 0
+        for entry in os.scandir(path):
+            if entry.is_file():
+                file_count += 1
+            elif entry.is_dir():
+                file_count += self.get_file_count(entry.path)
+        return file_count
+
+    def file_generator(self, search):
+        for root, _, files in os.walk(search):
             for file in files:
-                try:
-                    path = Path(root) / file
-                    metadata = Tagger(path)
-                    ext = file.split('.')[-1]
-                    results, tags_from = self.get_metadata(metadata, path)
+                yield root, file
 
-                    location = self.get_location(results, tags_from, metadata, ext, file)
+    def process_file(self, args):
+        root, file = args
 
-                    self.copy_file(path, location)
+        try:
+            path = Path(os.path.join(root, file))
+            metadata = Tagger(path)
+            ext = file.split('.')[-1]
+            results, tags_from = self.get_metadata(metadata, path)
+            location = self.get_location(results, tags_from, metadata, ext, file)
 
-                    logging.info(f"Saving tags for {location}")
-                    if tags_from == TagType.SPOTIFY:
-                        self.update_metadata_from_spotify(location, results)
-                    elif tags_from == TagType.FINGERPRINTER:
-                        self.update_metadata_from_fingerprinter(location, results)
-                    # If Via METADATA The act of copying the file also saves the tags
-                except ValueError as e:
-                    logging.error(f"Error processing file {file}: {e}")
-        logging.info('Organizing files finished.')
+            self.copy_file(path, location)
+
+            if tags_from == TagType.SPOTIFY:
+                self.update_metadata_from_spotify(location, results)
+            elif tags_from == TagType.FINGERPRINTER:
+                self.update_metadata_from_fingerprinter(location, results)
+
+            return None
+        except ValueError as e:
+            return f"Error processing file {file}: {e}"
+
+    def update_progress(self, pbar, result):
+        pbar.update()
+
+    def organize(self):
+        logging.top('Organizing files...')
+        file_count = self.get_file_count(self.search)
+
+        with Pool() as pool, tqdm(total=file_count, unit="file", miniters=0) as pbar:
+            for root, file in self.file_generator(self.search):
+                pool.apply_async(self.process_file, args=((root, file),),
+                                 callback=lambda result: self.update_progress(pbar, result))
+
+            pool.close()
+            pool.join()
+
+        logging.top('Organizing files finished.')
 
     def get_metadata(self, metadata: Tagger, file: Path):
         """
@@ -124,7 +150,8 @@ class MPORG:
             fingerprint_results = self.get_fingerprint_metadata(file)
             if fingerprint_results:
                 if fingerprint_results.type == "spotify":
-                    spotify_results = self.get_fingerprint_spotify_metadata(fingerprint_results.results.get("spotifyid"))
+                    spotify_results = self.get_fingerprint_spotify_metadata(
+                        fingerprint_results.results.get("spotifyid"))
                     if spotify_results:
                         logging.info(f"Metadata found using audio fingerprinting and Spotify for ID:"
                                      f" {fingerprint_results.results.get('spotifyid')}")
@@ -198,7 +225,7 @@ class MPORG:
         album = metadata.get("album")
 
         if not all((title, artist, album)):
-            logging.warning(f"Cannot tag '{file_name}' ...")
+            logging.warning(f"Cannot find enough metadata to organize '{file_name}' ...")
             return self.store / "_TaggingImpossible" / file_name
 
         track_artist = ", ".join(artist).strip()
