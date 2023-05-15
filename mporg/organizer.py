@@ -107,7 +107,7 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        artist = [u.replace('\x00', '') for u in metadata.get('artist', '')]  # Rplace Null Bytes
+        artist = [u.replace('\x00', '') for u in metadata.get('artist', '')]  # Replace Null Bytes
         title = [u.replace('\x00', '') for u in metadata.get('title', '')]
         if len(artist) == 1:
             artist = "".join(artist)
@@ -124,7 +124,8 @@ class MPORG:
             fingerprint_results = self.get_fingerprint_metadata(file)
             if fingerprint_results:
                 if fingerprint_results.type == "spotify":
-                    spotify_results = self.get_fingerprint_spotify_metadata(fingerprint_results.results.get("spotifyid"))
+                    spotify_results = self.get_fingerprint_spotify_metadata(
+                        fingerprint_results.results.get("spotifyid"))
                     if spotify_results:
                         logging.info(f"Metadata found using audio fingerprinting and Spotify for ID:"
                                      f" {fingerprint_results.results.get('spotifyid')}")

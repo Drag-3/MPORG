@@ -36,14 +36,14 @@ class ACRFingerprinter(Fingerprinter):
             logging.info(f"Using cached result for {path_to_fingerprint}")
             return cached_result
         try:
-            logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
+            logging.info(f"Starting fingerprinting for {path_to_fingerprint}")
             result = self.acrcloud.recognize_by_file(path_to_fingerprint, 0)
         except Exception as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
             return FingerprintResult(code="error", type="fail")
 
         out = FingerprintResult()
-        if not isinstance(result, dict):  # A Weired Error occured in acrcloud package
+        if not isinstance(result, dict):  # A Weired Error occurred in acrcloud package
             logging.critical(f"Invalid Response. Not of dict {result} for ||| {path_to_fingerprint}")
             out.code = 999
             out.type = "fail"
@@ -117,7 +117,7 @@ class MBFingerprinter(Fingerprinter):
             logging.info(f"Using cached result for {path_to_fingerprint}")
             return cached_result
         try:
-            logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
+            logging.info(f"Starting fingerprinting for {path_to_fingerprint}")
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
             result = lookup(self.api_key, fingerprint, duration, meta='recordings')
         except Exception as e:
