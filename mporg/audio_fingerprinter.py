@@ -13,7 +13,6 @@ from acrcloud.recognizer import ACRCloudRecognizer
 from mporg import CONFIG_DIR
 from mporg.spotify_searcher import Track
 
-
 logging.getLogger('__main.' + __name__)
 logging.propagate = True
 
@@ -36,71 +35,73 @@ class ACRFingerprinter(Fingerprinter):
             logging.info(f"Using cached result for {path_to_fingerprint}")
             return cached_result
         try:
-            logging.info(f"Starting fingerprinting for {path_to_fingerprint}")
-            result = self.acrcloud.recognize_by_file(path_to_fingerprint, 0)
+            logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
+            result = self.acrcloud.recognize_by_file(str(path_to_fingerprint), 0)
         except Exception as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
             return FingerprintResult(code="error", type="fail")
 
         out = FingerprintResult()
-        if not isinstance(result, dict):  # A Weired Error occurred in acrcloud package
-            logging.critical(f"Invalid Response. Not of dict {result} for ||| {path_to_fingerprint}")
+        if isinstance(result, str):  # For SOME reason recognize by file does NOT call json.loads
+            result = json.loads(result)
+        try:
+            out.code = result['status']['code']
+            if out.code != 0:
+                logging.info(f"Fingerprint request returned code {out.code}")
+                out.type = "fail"
+                self.cache.set(cache_key, out)
+                return out
+
+            track_result = result['metadata']['music'][0]
+            external_metadata = getattr(track_result.get('external_metadata'), 'spotify', {})
+            spotify_id = external_metadata.get('track', {}).get('id')
+            if spotify_id:
+                out.type = "spotify"
+                out.results = {"spotifyid": spotify_id}
+                logging.debug(f"Fingerprint request returned ID : {spotify_id}")
+                self.cache.set(cache_key, out)
+                return out
+
+            album = track_result.get('album', {}).get('name')
+            label = track_result.get('label')
+            date = track_result.get('release_date', '')
+            date = date.split('-')[0] if date else ''
+            track = track_result.get('title')
+            genres_o = track_result.get('genres', [])
+            genres = []
+            for g in genres_o:
+                logging.debug(g)
+                logging.debug(type(g))
+                if isinstance(g, dict):
+                    genres.append(g.get('name'))
+                else:
+                    try:
+                        j = json.loads(g)
+                        genres.append(j.get('name'))
+                    except TypeError:
+                        genres.append(g)  # Is a normal string
+            genres = ';'.join(genres)
+
+            artists = [ftfy(z.get('name')) for z in track_result.get('artists', [])]
+
+            out.type = "track"
+            out.results = Track(
+                track_name=track,
+                track_year=date,
+                track_artists=artists,
+                album_artists=artists,
+                album_genres=genres,
+                album_name=album
+            )
+            logging.debug(f"Fingerprint request returns: {out.results}")
+
+            self.cache.set(cache_key, out)
+            return out
+        except Exception as e:
+            logging.warning(f"Error when attempting to fingerprint. {e}")
             out.code = 999
             out.type = "fail"
             return out
-
-        out.code = result['status']['code']
-        if out.code != 0:
-            logging.info(f"Fingerprint request returned code {out.code}")
-            out.type = "fail"
-            self.cache.set(cache_key, out)
-            return out
-
-        track_result = result['metadata']['music'][0]
-        external_metadata = getattr(track_result.get('external_metadata'), 'spotify', {})
-        spotify_id = external_metadata.get('track', {}).get('id')
-        if spotify_id:
-            out.type = "spotify"
-            out.results = {"spotifyid": spotify_id}
-            logging.debug(f"Fingerprint request returned ID : {spotify_id}")
-            self.cache.set(cache_key, out)
-            return out
-
-        album = track_result.get('album', {}).get('name')
-        label = track_result.get('label')
-        date = track_result.get('release_date', '')
-        date = date.split('-')[0] if date else ''
-        track = track_result.get('title')
-        genres_o = track_result.get('genres', [])
-        genres = []
-        for g in genres_o:
-            logging.debug(g)
-            logging.debug(type(g))
-            if isinstance(g, dict):
-                genres.append(g.get('name'))
-            else:
-                try:
-                    j = json.loads(g)
-                    genres.append(j.get('name'))
-                except TypeError:
-                    genres.append(g)  # Is a normal string
-        genres = ';'.join(genres)
-
-        artists = [ftfy(z.get('name')) for z in track_result.get('artists', [])]
-
-        out.type = "track"
-        out.results = Track(
-            track_name=track,
-            track_year=date,
-            track_artists=artists,
-            album_artists=artists,
-            album_genres=genres,
-            album_name=album
-        )
-        logging.debug(f"Fingerprint request returns: {out.results}")
-
-        self.cache.set(cache_key, out)
-        return out
 
 
 class MBFingerprinter(Fingerprinter):
@@ -117,7 +118,7 @@ class MBFingerprinter(Fingerprinter):
             logging.info(f"Using cached result for {path_to_fingerprint}")
             return cached_result
         try:
-            logging.info(f"Starting fingerprinting for {path_to_fingerprint}")
+            logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
             result = lookup(self.api_key, fingerprint, duration, meta='recordings')
         except Exception as e:

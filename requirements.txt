@@ -5,3 +5,4 @@ mutagen~=1.46.0
 pyacoustid~=1.2.2
 spotipy~=2.23.0
 pyacrcloud~=1.0.1
+tqdm~=4.65.0
