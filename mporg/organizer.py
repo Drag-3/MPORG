@@ -7,6 +7,8 @@ import shutil
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4
+from mutagen.wave import WAVE
+from mutagen.asf import ASF
 
 from mporg.spotify_searcher import SpotifySearcher, Track
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
@@ -28,6 +30,10 @@ class Tagger:
             self.tagger = EasyID3(file)
         elif extension.lower() == ".m4a":
             self.tagger = EasyMP4(file)
+        elif extension.lower() == ".wav":
+            self.tagger = WAVE(file)
+        elif extension.lower() in [".wma"]:
+            self.tagger = ASF(file)
         else:
             logging.warning(f"{file} has invalid extension {extension}")
             raise ValueError("Invalid Extension")
