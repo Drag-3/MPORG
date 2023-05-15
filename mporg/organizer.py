@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 import shutil
-from multiprocessing import Pool
+from multiprocessing import Pool, Lock
 
 from tqdm import tqdm
 
@@ -60,6 +60,26 @@ class TagType(enum.Enum):
     METADATA = 2
 
 
+def file_generator(search):
+    for root, _, files in os.walk(search):
+        for file in files:
+            yield root, file
+
+
+def get_file_count(path):
+    file_count = 0
+    for entry in os.scandir(path):
+        if entry.is_file():
+            file_count += 1
+        elif entry.is_dir():
+            file_count += get_file_count(entry.path)
+    return file_count
+
+
+def update_progress(pbar):
+    pbar.update()
+
+
 class MPORG:
 
     def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]):
@@ -67,26 +87,13 @@ class MPORG:
         self.store = store
         self.sh = searcher
         self.af = fingerprinters
+        self.file_locks = {}
         # Register tags not initial
         EasyID3.RegisterTextKey("comment", "COMM")
         EasyID3.RegisterTextKey("initialkey", "TKEY")
         EasyID3.RegisterTextKey("source", "WOAS")
         EasyMP4.RegisterTextKey("source", "source")
         EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
-
-    def get_file_count(self, path):
-        file_count = 0
-        for entry in os.scandir(path):
-            if entry.is_file():
-                file_count += 1
-            elif entry.is_dir():
-                file_count += self.get_file_count(entry.path)
-        return file_count
-
-    def file_generator(self, search):
-        for root, _, files in os.walk(search):
-            for file in files:
-                yield root, file
 
     def process_file(self, args):
         root, file = args
@@ -109,17 +116,14 @@ class MPORG:
         except ValueError as e:
             return f"Error processing file {file}: {e}"
 
-    def update_progress(self, pbar, result):
-        pbar.update()
-
     def organize(self):
         logging.top('Organizing files...')
-        file_count = self.get_file_count(self.search)
+        file_count = get_file_count(self.search)
 
         with Pool() as pool, tqdm(total=file_count, unit="file", miniters=0) as pbar:
-            for root, file in self.file_generator(self.search):
+            for root, file in file_generator(self.search):
                 pool.apply_async(self.process_file, args=((root, file),),
-                                 callback=lambda result: self.update_progress(pbar, result))
+                                 callback=lambda result: update_progress(pbar))
 
             pool.close()
             pool.join()
@@ -267,8 +271,7 @@ class MPORG:
         path /= f'{" - ".join(parts)}.{file_extension}'
         return path
 
-    @staticmethod
-    def copy_file(source: Path, destination: Path) -> None:
+    def copy_file(self, source: Path, destination: Path) -> None:
         """
         Copy the file from the source location to the destination location
         :param source:
@@ -277,23 +280,31 @@ class MPORG:
         """
         if not os.path.exists(destination):
             logging.info(f"Copying {source} to {destination}")
+
+            if source not in self.file_locks:
+                self.file_locks[source] = Lock()
+
             try:
-                shutil.copyfile(source, destination)
+                with self.file_locks[source]:
+                    shutil.copyfile(source, destination)
             except (OSError, IOError):
                 try:
                     os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o666)
-                    shutil.copyfile(source, destination)
+                    with self.file_locks[source]:
+                        shutil.copyfile(source, destination)
                 except (OSError, IOError) as e:
                     logging.exception(e)
 
-    @staticmethod
-    def update_metadata_from_spotify(location: Path, results: Track) -> None:
+    def update_metadata_from_spotify(self, location: Path, results: Track) -> None:
         """
         Update file metadata with Spotify results
         :param location:
         :param results:
         :return:
         """
+        if location not in self.file_locks:
+            self.file_locks[location] = Lock()
+
         metadata = Tagger(location)
         metadata['title'] = results.track_name
         metadata['artist'] = ";".join(results.track_artists)
@@ -311,12 +322,15 @@ class MPORG:
             pass
         metadata['genre'] = results.album_genres
         try:
-            metadata.save()
+            with self.file_locks[location]:
+                metadata.save()
         except mutagen.MutagenError as e:
             logging.exception(e)
 
-    @staticmethod
-    def update_metadata_from_fingerprinter(location: Path, results: Track) -> None:
+    def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
+        if location not in self.file_locks:
+            self.file_locks[location] = Lock()
+
         metadata = Tagger(location)
         metadata['title'] = results.track_name
         metadata['artist'] = ";".join(results.track_artists)
@@ -334,7 +348,8 @@ class MPORG:
         except ValueError:
             pass
         try:
-            metadata.save()
+            with self.file_locks[location]:
+                metadata.save()
         except mutagen.MutagenError as e:
             logging.exception(e)
 

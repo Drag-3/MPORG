@@ -125,7 +125,7 @@ def set_logging(v: bool):
     # Create a console handler and set the formatter
     console_handler = ColorHandler()
     #console_handler.stream = sys.stderr
-    console_handler.setLevel(logging.DEBUG if v else logging.CRITICAL)
+    console_handler.setLevel(logging.DEBUG if v else logging.TOP)
     console_handler.setFormatter(c_formatter)
 
     # Add both handlers to the logger
