@@ -198,7 +198,7 @@ class MPORG:
         album = metadata.get("album")
 
         if not all((title, artist, album)):
-            logging.warning(f"Cannot tag '{file_name}' ...")
+            logging.warning(f"Cannot find enough metadata to organize '{file_name}' ...")
             return self.store / "_TaggingImpossible" / file_name
 
         track_artist = ", ".join(artist).strip()
