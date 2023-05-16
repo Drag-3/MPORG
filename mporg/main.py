@@ -294,7 +294,7 @@ def main():
     if args.acrcloud or args.fingerprint:
         fingerprinters.append(ACRFingerprinter(acrcloud_creds))
     if args.music_brainz or args.fingerprint:
-        fingerprinters.append(MBFingerprinter(mbid))
+        fingerprinters.append(MBFingerprinter(mbid['api']))
 
     logging.info("All good, starting Organizing")
     org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinters)

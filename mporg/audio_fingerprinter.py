@@ -3,14 +3,15 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 import json
+from pprint import pprint
 
 import musicbrainzngs
 import diskcache
 from ftfy import ftfy
-from acoustid import fingerprint_file, lookup
+from acoustid import fingerprint_file, lookup, FingerprintGenerationError
 from acrcloud.recognizer import ACRCloudRecognizer
 
-from mporg import CONFIG_DIR
+from mporg import CONFIG_DIR, VERSION
 from mporg.spotify_searcher import Track
 
 logging.getLogger('__main.' + __name__)
@@ -106,7 +107,7 @@ class ACRFingerprinter(Fingerprinter):
 
 class MBFingerprinter(Fingerprinter):
     def __init__(self, mbid):
-        musicbrainzngs.set_useragent("python-MPORG", "0.1", contact="juserysthee@gmail.com")
+        musicbrainzngs.set_useragent(app="python-MPORG", version=VERSION, contact="juserysthee@gmail.com")
         self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "audiocache_M"))
         self.api_key = mbid
         musicbrainzngs.set_rate_limit(False)
@@ -120,69 +121,120 @@ class MBFingerprinter(Fingerprinter):
         try:
             logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
-            result = lookup(self.api_key, fingerprint, duration, meta='recordings')
-        except Exception as e:
+            api_result = lookup(self.api_key, fingerprint, duration, meta='recordings')
+        except FingerprintGenerationError as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
             return FingerprintResult(code="error", type="fail")
 
         out = FingerprintResult()
-        recordings = result.get('recordings', [])
+        result = api_result.get('results', [])
+        if not result:
+            logging.debug(f"Fingerprint request returned no results")
+            out.type = "fail"
+            return out
+
+        recordings = result[0].get('recordings', [])
         if not recordings:
             logging.debug(f"Fingerprint request returned no results")
             out.type = "fail"
             return out
 
         recording = recordings[0]
-        release_id = recording.get('release', {}).get('id')
+        release_id = recording.get('id')
         if not release_id:
             logging.debug(f"Fingerprint request returned no release ID")
             out.type = "fail"
             return out
 
         try:
-            release = musicbrainzngs.get_release_by_id(release_id, includes=['artists', 'recordings'])
+            musicbrainzngs.set_useragent(app="python-MPORG", version=VERSION, contact="juserysthee@gmail.com")
+            m_response = musicbrainzngs.get_recording_by_id(release_id,
+                                                            includes=['url-rels', 'artists', 'tags', 'releases'])
         except musicbrainzngs.WebServiceError as exc:
-            logging.exception(f"Error fetching release info from MusicBrainz: {exc}")
+            logging.warning(f"Error fetching release info from MusicBrainz: {exc}")
             out.type = "fail"
+            out.code = 3
             return out
 
-        external_metadata = recording.get('externalids', {}).get('spotify', {})
-        spotify_id = external_metadata.get('uri', '').split(':')[-1]
-        if spotify_id:
-            out.type = "spotify"
-            out.results = {"spotifyid": spotify_id}
-            logging.debug(f"Fingerprint request returned ID: {spotify_id}")
-            return out
-
-        recording_info = next(
-            (x for x in release['medium-list'][0]['track-list'] if x['recording']['id'] == recording['id']), None)
+        recording_info = m_response.get('recording', {})
         if not recording_info:
-            logging.debug(f"Fingerprint request returned no recording info")
+            logging.info("Musicbrainz did not return any recording info")
             out.type = "fail"
+            out.code = 7
+            self.cache.set(cache_key, out)
             return out
+
+        url_relations = recording_info.get('url-relation-list', [])
+        for relation in url_relations:
+            url = relation.get('target', '')
+            if r'open.spotify.com/track/' in url:
+                # Spotify Track. ID is in it
+                spotify_id = url.split('/')[-1]
+                out.type = "spotify"
+                out.results = {"spotifyid": spotify_id}
+                logging.debug(f"Fingerprint request returned ID: {spotify_id}")
+                out.code = 0
+                self.cache.set(cache_key, out)
+                return out
+
+        release_info = recording_info.get('release-list', [])
+
+        if not release_info:
+            logging.warning("Musicbrainz did not return any album information")
+            out.type = "fail"
+            out.code = 9
+            self.cache.set(cache_key, out)
+            return out
+
+        for release in release_info:
+            album = release.get('title')
+            date = release.get('date', '0').split('-')[0]
+            album_id = release.get('id', '')
+            if all((album, date, album_id)):
+                break
 
         track = recording_info['title']
-        album = release['title']
-        artists = [ftfy(x['name']) for x in recording['artist-credit']]
-        album_artists = [ftfy(x['name']) for x in release['artist-credit']]
-        album_genres = ";".join(self._get_album_genres(release))
+        artists = [ftfy(x.get('artist', {}).get('name', {})) for x in recording_info['artist-credit']]
+        genres = []
+        for artist in recording_info['artist-credit']:
+            t_list = artist.get('artist', {}).get('tag-list', [])
+            genres += t_list
+
+        album_genres = ";".join(self._get_album_genres({'tag-list': genres}))
+
+        album_artists = artists
+        if not all((track, artists, album_artists, album)) or date == '0':
+            logging.warning("Musicbrainz did not return enough metadata")
+            out.type = "fail"
+            out.code = 15
+            self.cache.set(cache_key, out)
+            return out
 
         out.type = "track"
+        out.code = 0
         out.results = Track(
             track_name=track,
-            track_year=release.get('date', '')[:4],
+            track_year=date,
             track_artists=artists,
             album_artists=album_artists,
             album_genres=album_genres,
-            album_name=album
+            album_name=album,
+            track_id=release_id,
+            album_id=album_id
         )
         logging.debug(f"Fingerprint request returns: {out.results}")
+        self.cache.set(cache_key, out)
         return out
 
     @staticmethod
     def _get_album_genres(release: dict) -> list[str]:
+
         tags = release.get('tag-list', [])
-        return [x['name'] for x in tags if x.get('count', 0) > 1]
+        t_names = set()
+        for tag in tags:
+            if int(tag.get('count', 0)) >= 1:
+                t_names.add(tag.get('name'))
+        return list(t_names)
 
 
 @dataclass
