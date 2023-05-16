@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tqdm
 
-from mporg import CONFIG_DIR, VERSION
+from mporg import CONFIG_DIR, VERSION, LOG_DIR
 from mporg.organizer import MPORG
 from mporg.audio_fingerprinter import ACRFingerprinter, MBFingerprinter
 from mporg.spotify_searcher import SpotifySearcher
@@ -113,12 +113,15 @@ def set_logging(v: bool):
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if v else logging.INFO)
 
+    if not LOG_DIR.exists():
+        LOG_DIR.mkdir(0o600)
+
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
     c_formatter = ColoredFormatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
     formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
     # Create a file handler and set the formatter
-    file_handler = RotatingFileHandler('MPORG.log', maxBytes=1000000, backupCount=5, encoding='utf-8')
+    file_handler = RotatingFileHandler(LOG_DIR / 'MPORG.log', maxBytes=1000000, backupCount=5, encoding='utf-8')
     file_handler.setLevel(logging.DEBUG if v else logging.INFO)
     file_handler.setFormatter(formatter)
 
