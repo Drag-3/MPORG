@@ -8,5 +8,5 @@ spotipy~=2.23.0
 pyacrcloud~=1.0.1; sys_platform == 'linux'
 
 # Windows requirements
-git+https://github.com/acrcloud/acrcloud_sdk_python; sys_platform == 'win64'
+git+https://github.com/acrcloud/acrcloud_sdk_python; sys_platform == 'win32'
 tqdm~=4.65.0
