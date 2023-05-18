@@ -66,7 +66,9 @@ jobs:
         if (Test-Path requirements_tests.txt) { pip install -r requirements_tests.txt }
         Invoke-WebRequest https://github.com/acrcloud/acrcloud_sdk_python/raw/master/windows/vcredist_x64.exe -OutFile "vcredist_x64.exe"
         .\vcredist_x64.exe /q /norestart
-        ls C:\hostedtoolcache\windows\Python\3.10.11\x64\lib\site-packages\acrcloud
+        python
+        from acrcloud import acrcloud_extr_tool
+        exit()
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
