@@ -344,7 +344,6 @@ class TestMPORGWithMocks(unittest.TestCase):
 
     @patch('mporg.organizer.Tagger')
     def test_process_file_spotify(self, tag):
-
         spotifyRes = mp.Track(track_name='Test Track', track_artists=['Test Artist'], album_name='Test Album',
                               album_year='2023', track_number=1, track_disk=1, track_url='http://example.com',
                               album_artists=['Test Artist'], track_bpm='120', track_key='C',
@@ -389,7 +388,11 @@ class TestMPORGWithMocks(unittest.TestCase):
         ])
 
 
-if __name__ == '__main__':
+def test():
     if not mporg.CONFIG_DIR.exists():
         mporg.CONFIG_DIR.mkdir()
     unittest.main()
+
+
+if __name__ == '__main__':
+    test()

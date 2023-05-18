@@ -12,3 +12,4 @@ git+https://github.com/acrcloud/acrcloud_sdk_python; sys_platform == 'win64'
 tqdm~=4.65.0
 parameterized~=0.9.0
 setuptools~=67.7.2
+unittest-xml-reporting

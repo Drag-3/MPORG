@@ -113,16 +113,12 @@ def set_logging(v: bool):
     # Set up logging
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if v else logging.INFO)
-    print(Path.cwd())
-    print(f"LOG: {LOG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
-    print(f"Config: {CONFIG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
+
     if not CONFIG_DIR.exists():
         os.mkdir(CONFIG_DIR)
         logging.debug(f"Creating {CONFIG_DIR}")
     if not LOG_DIR.exists():
         LOG_DIR.mkdir()
-    print(f"LOG: {LOG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
-    print(f"Config: {CONFIG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
 
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
@@ -313,6 +309,4 @@ def main():
 
 
 if __name__ == "__main__":
-    if not mporg.CONFIG_DIR.exists():
-        mporg.CONFIG_DIR.mkdir(0o777)
     main()

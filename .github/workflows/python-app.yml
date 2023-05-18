@@ -39,7 +39,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Run unit Tests
       run: |
-        python -m unittest discover -s tests
+        python -m tests.main
     - name: Upload test results
       uses: actions/upload-artifact@v3
       with:
@@ -72,7 +72,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Run unit Tests
       run: |
-        python -m unittest discover -s tests
+        python -m tests.main
     - name: Upload test results
       uses: actions/upload-artifact@v3
       with:
