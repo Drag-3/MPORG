@@ -296,7 +296,7 @@ class MPORG:
                     shutil.copyfile(source, destination)
             except (OSError, IOError):
                 try:
-                    os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o666)
+                    os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
                     with self.file_locks[source]:
                         shutil.copyfile(source, destination)
                 except (OSError, IOError) as e:
