@@ -41,7 +41,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
           name: test-results-linux
-          path: test-results-linux.xml
+          path: test-results.xml
           
   test-windows:
 
@@ -57,7 +57,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install flake8
-        if exist requirements_tests.txt pip install -r requirements_tests.txt
+        if exist requirements_tests.txt (pip install -r requirements_tests.txt)
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
@@ -70,5 +70,5 @@ jobs:
     - name: Upload test results
       uses: actions/upload-artifact@v2
       with:
-          name: test-results-linux
-          path: test-results-linux.xml
+          name: test-results-windows
+          path: test-results.xml
