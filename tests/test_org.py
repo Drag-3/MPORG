@@ -390,4 +390,6 @@ class TestMPORGWithMocks(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    if not mporg.CONFIG_DIR.exists():
+        mporg.CONFIG_DIR.mkdir()
     unittest.main()
