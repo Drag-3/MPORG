@@ -63,7 +63,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install flake8
-        Invoke-WebRequest https://github.com/acrcloud/acrcloud_sdk_python/raw/master/windows/vcredist_x64.exe -OutFile "vcredist_x64.exe"
+        Invoke-WebRequest https://aka.ms/highdpimfc2013x64enu -OutFile "vcredist_x64.exe"
         .\vcredist_x64.exe /q /norestart
         if (Test-Path requirements_tests.txt) { pip install -r requirements_tests.txt }
     - name: Lint with flake8

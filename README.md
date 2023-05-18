@@ -31,13 +31,13 @@ To install in order to edit or modify
     ```bash
     cd mporg
     ```
-3. Install the required dependencies:
+3. On WINDOWS DEVICES ONLY, install the required dlls for acrcloud to work from the acrcloud [Github](https://github.com/acrcloud/acrcloud_sdk_python). This must be done before you use the requirements file.
+
+   ![img.png](img.png)
+4. Install the required dependencies:
     ```bash
    pip install -r requirements.txt  OR pip install -r requirements_tests.txt
     ```
-4. On Windows Devices, install the required dlls for acrcloud to work from the acrcloud [Github](https://github.com/acrcloud/acrcloud_sdk_python)
-
-   ![img.png](img.png)
    
 ## Usage
 Upon a normal run MPORG will search search-path for music files, and copy organized files to store-path
