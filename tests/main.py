@@ -1,7 +1,7 @@
 import os
 import unittest
 import xmlrunner
-from acrcloud import recognizer, acrcloud_extr_tool
+from acrcloud import acrcloud_extr_tool, recognizer
 
 if __name__ == '__main__':
     root_dir = os.path.dirname(__file__)
