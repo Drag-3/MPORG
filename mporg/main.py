@@ -116,6 +116,9 @@ def set_logging(v: bool):
     print(Path.cwd())
     print(f"LOG: {LOG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
     print(f"Config: {CONFIG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
+    if not CONFIG_DIR.exists():
+        os.mkdir(CONFIG_DIR)
+        logging.debug(f"Creating {CONFIG_DIR}")
     if not LOG_DIR.exists():
         LOG_DIR.mkdir()
     print(f"LOG: {LOG_DIR.absolute()}, Exists: {LOG_DIR.exists()}")
