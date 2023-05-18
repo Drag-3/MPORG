@@ -113,9 +113,11 @@ def set_logging(v: bool):
     # Set up logging
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if v else logging.INFO)
-
+    print(Path.cwd())
+    print(f"LOG: {LOG_DIR.name}, Exists: {LOG_DIR.exists()}")
     if not LOG_DIR.exists():
-        os.makedirs(os.path.dirname(LOG_DIR), mode=0o777)
+        LOG_DIR.mkdir()
+    print(f"LOG: {LOG_DIR.name}, Exists: {LOG_DIR.exists()}")
 
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
