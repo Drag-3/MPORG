@@ -154,7 +154,7 @@ def get_credentials(use_acr: bool = False, use_mb: bool = False):
         logging.debug(f"Creating {acrcloud_path}")
 
     if not acoustid_path.exists():
-        acoustid_path.touch(0o666)
+        acoustid_path.touch(0o700)
         logging.debug(f"Creating {acoustid_path}")
 
     acrdata = None
