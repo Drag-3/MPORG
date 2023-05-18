@@ -28,6 +28,7 @@ class ACRFingerprinter(Fingerprinter):
     def __init__(self, config: dict):
         self.acrcloud = ACRCloudRecognizer(config)
         self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "audiocache_A"))
+        # Acrcloud is paid, so I will not set the cache to expire as of now
 
     def fingerprint(self, path_to_fingerprint: Path) -> 'FingerprintResult':
         cache_key = str(path_to_fingerprint)
@@ -40,7 +41,7 @@ class ACRFingerprinter(Fingerprinter):
             result = self.acrcloud.recognize_by_file(str(path_to_fingerprint), 0)
         except Exception as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
-            return FingerprintResult(code="error", type="fail")
+            return FingerprintResult(code=9, type="fail")
 
         out = FingerprintResult()
         if isinstance(result, str):  # For SOME reason recognize by file does NOT call json.loads
@@ -109,6 +110,7 @@ class MBFingerprinter(Fingerprinter):
     def __init__(self, mbid):
         musicbrainzngs.set_useragent(app="python-MPORG", version=VERSION, contact="juserysthee@gmail.com")
         self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "audiocache_M"))
+        self.cache.expire(60 * 60 * 12)  # Set the cache to expire in 12 hours
         self.api_key = mbid
         musicbrainzngs.set_rate_limit(False)
 
@@ -124,7 +126,7 @@ class MBFingerprinter(Fingerprinter):
             api_result = lookup(self.api_key, fingerprint, duration, meta='recordings')
         except FingerprintGenerationError as e:
             logging.exception(f"Error recognizing fingerprint: {e}")
-            return FingerprintResult(code="error", type="fail")
+            return FingerprintResult(code=9, type="fail")
 
         out = FingerprintResult()
         result = api_result.get('results', [])
@@ -187,7 +189,7 @@ class MBFingerprinter(Fingerprinter):
             return out
 
         for release in release_info:
-            album = release.get('title')
+            album = release.get('title', None)
             date = release.get('date', '0').split('-')[0]
             album_id = release.get('id', '')
             if all((album, date, album_id)):
@@ -239,6 +241,6 @@ class MBFingerprinter(Fingerprinter):
 
 @dataclass
 class FingerprintResult:
-    code: str = None
+    code: int = None
     type: str = None
     results: Track | dict = None

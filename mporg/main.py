@@ -278,8 +278,8 @@ def main():
     arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters. (Same as -am)", action="store_true")
 
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
-                            help="Root of area to store organized files")
-    arg_parser.add_argument("search_path", default=Path.cwd(), help="Source dir to look for mp3 files in.")
+                            help="Root of area to store organized files", nargs='?')
+    arg_parser.add_argument("search_path", default=Path.cwd(), help="Source dir to look for mp3 files in.", nargs='?')
 
     args = arg_parser.parse_args()
     set_logging(args.verbose)

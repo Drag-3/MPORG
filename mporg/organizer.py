@@ -50,6 +50,9 @@ class Tagger:
     def __setitem__(self, key, value):
         self.tagger.__setitem__(key, value)
 
+    def add_tags(self):
+        self.tagger.add_tags()
+
     def save(self):
         self.tagger.save()
 
@@ -100,7 +103,11 @@ class MPORG:
 
         try:
             path = Path(os.path.join(root, file))
-            metadata = Tagger(path)
+            try:
+                metadata = Tagger(path)
+            except mutagen.MutagenError:
+                metadata = {}
+
             ext = file.split('.')[-1]
             results, tags_from = self.get_metadata(metadata, path)
             location = self.get_location(results, tags_from, metadata, ext, file)
@@ -260,7 +267,7 @@ class MPORG:
         # Build filename
         if track_num:
             if isinstance(track_num, str):  # Prob in form num / total so remove the /total
-                parts.append(f"{int(_remove_invalid_path_chars(track_num.split('/')[0]))}")
+                parts.append(f"{int(_remove_invalid_path_chars(track_num.split('/')[0]))}.")
             else:
                 parts.append(f"{track_num}.")
         if track_artist and track_artist != "Unknown":
