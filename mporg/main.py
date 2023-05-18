@@ -115,7 +115,7 @@ def set_logging(v: bool):
     logger.setLevel(logging.DEBUG if v else logging.INFO)
 
     if not LOG_DIR.exists():
-        LOG_DIR.mkdir(0o666)
+        os.makedirs(os.path.dirname(LOG_DIR), mode=0o777)
 
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
