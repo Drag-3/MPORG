@@ -90,7 +90,6 @@ def get_file_count(path):
 def pool_callback(result, pbar):
     pbar.update()
     if result:
-        print(result)
         logging.warning(result)
 
 
