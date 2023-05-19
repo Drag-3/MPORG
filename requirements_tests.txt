@@ -4,7 +4,12 @@ musicbrainzngs~=0.7.1
 mutagen~=1.46.0
 pyacoustid~=1.2.2
 spotipy~=2.23.0
-pyacrcloud~=1.0.1
+# Linux requirements
+pyacrcloud~=1.0.1; sys_platform == 'linux'
+
+# Windows requirements
+git+https://github.com/acrcloud/acrcloud_sdk_python; sys_platform == 'win32'
 tqdm~=4.65.0
 parameterized~=0.9.0
 setuptools~=67.7.2
+unittest-xml-reporting

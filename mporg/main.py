@@ -8,6 +8,7 @@ from pathlib import Path
 
 import tqdm
 
+import mporg
 from mporg import CONFIG_DIR, VERSION, LOG_DIR
 from mporg.organizer import MPORG
 from mporg.audio_fingerprinter import ACRFingerprinter, MBFingerprinter
@@ -113,8 +114,11 @@ def set_logging(v: bool):
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if v else logging.INFO)
 
+    if not CONFIG_DIR.exists():
+        os.mkdir(CONFIG_DIR)
+        logging.debug(f"Creating {CONFIG_DIR}")
     if not LOG_DIR.exists():
-        LOG_DIR.mkdir(0o666)
+        LOG_DIR.mkdir()
 
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
@@ -271,11 +275,11 @@ def get_acrcloud_credentials(acrcred):
 
 def main():
     arg_parser = ArgumentParser()
-    arg_parser.add_argument("-v", "--version", help="Show Version", action="store_true")
-    arg_parser.add_argument("-V", "--verbose", help="Print", action="store_true")
-    arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud", action="store_true")
-    arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz", action="store_true")
-    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters. (Same as -am)", action="store_true")
+    arg_parser.add_argument("-v", "--version", help="Show the version of MPORG.", action="store_true")
+    arg_parser.add_argument("-V", "--verbose", help="Print detailed output during execution.", action="store_true")
+    arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud for audio fingerprinting.", action="store_true")
+    arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.", action="store_true")
+    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters (same as -am).", action="store_true")
 
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
                             help="Root of area to store organized files", nargs='?')
