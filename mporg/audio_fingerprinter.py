@@ -179,7 +179,7 @@ class MBFingerprinter(Fingerprinter):
                 self.cache.set(cache_key, out)
                 return out
 
-        release_info = recording_info.get('release-list', [])
+        release_info = [r for r in recording_info.get('release-list', []) if isinstance(r, dict)]
 
         if not release_info:
             logging.warning("Musicbrainz did not return any album information")
@@ -196,9 +196,11 @@ class MBFingerprinter(Fingerprinter):
                 break
 
         track = recording_info['title']
-        artists = [ftfy(x.get('artist', {}).get('name', {})) for x in recording_info['artist-credit']]
+        artist_credit = [a for a in recording_info['artist-credit'] if isinstance(a, dict)]
+
+        artists = [ftfy(x.get('artist', {}).get('name', {})) for x in artist_credit]
         genres = []
-        for artist in recording_info['artist-credit']:
+        for artist in artist_credit:
             t_list = artist.get('artist', {}).get('tag-list', [])
             genres += t_list
 
