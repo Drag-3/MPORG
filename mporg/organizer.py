@@ -28,6 +28,14 @@ class Tagger:
     """
 
     def __init__(self, file: Path):
+        # Register Non-Standard Keys for Easy
+        EasyID3.RegisterTextKey("comment", "COMM")
+        EasyID3.RegisterTextKey("initialkey", "TKEY")
+        EasyID3.RegisterTextKey("source", "WOAS")
+        EasyMP4.RegisterTextKey("source", "source")
+        EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
+
+        # Determine mutagen object to use
         extension = file.suffix
         if extension.lower() == ".mp3":
             self.tagger = EasyID3(file)
@@ -79,8 +87,11 @@ def get_file_count(path):
     return file_count
 
 
-def update_progress(pbar):
+def pool_callback(result, pbar):
     pbar.update()
+    if result:
+        print(result)
+        logging.warning(result)
 
 
 class MPORG:
@@ -91,12 +102,6 @@ class MPORG:
         self.sh = searcher
         self.af = fingerprinters
         self.file_locks = {}
-        # Register tags not initial
-        EasyID3.RegisterTextKey("comment", "COMM")
-        EasyID3.RegisterTextKey("initialkey", "TKEY")
-        EasyID3.RegisterTextKey("source", "WOAS")
-        EasyMP4.RegisterTextKey("source", "source")
-        EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
 
     def process_file(self, args):
         root, file = args
@@ -122,6 +127,8 @@ class MPORG:
             return None
         except ValueError as e:
             return f"Error processing file {file}: {e}"
+        except BaseException as e:
+            return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
         logging.top('Organizing files...')
@@ -130,7 +137,7 @@ class MPORG:
         with Pool() as pool, tqdm(total=file_count, unit="file", miniters=0) as pbar:
             for root, file in file_generator(self.search):
                 pool.apply_async(self.process_file, args=((root, file),),
-                                 callback=lambda result: update_progress(pbar))
+                                 callback=lambda result: pool_callback(result, pbar))
 
             pool.close()
             pool.join()
