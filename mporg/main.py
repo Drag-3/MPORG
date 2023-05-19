@@ -275,11 +275,11 @@ def get_acrcloud_credentials(acrcred):
 
 def main():
     arg_parser = ArgumentParser()
-    arg_parser.add_argument("-v", "--version", help="Show Version", action="store_true")
-    arg_parser.add_argument("-V", "--verbose", help="Print", action="store_true")
-    arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud", action="store_true")
-    arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz", action="store_true")
-    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters. (Same as -am)", action="store_true")
+    arg_parser.add_argument("-v", "--version", help="Show the version of MPORG.", action="store_true")
+    arg_parser.add_argument("-V", "--verbose", help="Print detailed output during execution.", action="store_true")
+    arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud for audio fingerprinting.", action="store_true")
+    arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.", action="store_true")
+    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters (same as -am).", action="store_true")
 
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
                             help="Root of area to store organized files", nargs='?')
