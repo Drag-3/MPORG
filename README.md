@@ -22,14 +22,14 @@ To install this project for normal use:
    ![img_1.png](img_1.png)
 2. Install the project using pip:
    ```bash
-   pip install git+https://github.com/Drag-3/MP3ORG.git
+   pip install git+https://github.com/Drag-3/MPORG.git
    ```
 ### Dev Installation
 To install for editing or modification:
 1. Clone this repo:
    
    ```bash
-   git clone https://github.com/Drag-3/MP3ORG.git
+   git clone https://github.com/Drag-3/MPORG.git
    ```
 2. Navigate to the cloned directory:
    
