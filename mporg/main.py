@@ -53,8 +53,11 @@ class ColorHandler(logging.StreamHandler):
 
         csi = f"{chr(27)}["  # control sequence introducer
         color = level_color_map.get(record.levelno, self.WHITE)
-
-        tqdm.tqdm.write(f"{csi}{color}m{self.format(record)}{csi}m", file=sys.stdout)
+        try:
+            tqdm.tqdm.write(f"{csi}{color}m{self.format(record)}{csi}m", file=sys.stderr)
+            self.flush()
+        except Exception:
+            self.handleError(record)
 
 
 def addLoggingLevel(levelName, levelNum, methodName=None):

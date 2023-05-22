@@ -1,9 +1,12 @@
+
 import enum
 import logging
 import os
+from threading import Lock
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 import shutil
-from multiprocessing import Pool, Lock
 
 from tqdm import tqdm
 
@@ -101,10 +104,10 @@ class MPORG:
         self.sh = searcher
         self.af = fingerprinters
         self.file_locks = {}
+        self.executor = ThreadPoolExecutor()
 
     def process_file(self, args):
         root, file = args
-
         try:
             path = Path(os.path.join(root, file))
             try:
@@ -133,13 +136,14 @@ class MPORG:
         logging.top('Organizing files...')
         file_count = get_file_count(self.search)
 
-        with Pool() as pool, tqdm(total=file_count, unit="file", miniters=0) as pbar:
+        with tqdm(total=file_count, unit="file", miniters=0) as pbar:
+            futures = []
             for root, file in file_generator(self.search):
-                pool.apply_async(self.process_file, args=((root, file),),
-                                 callback=lambda result: pool_callback(result, pbar))
+                future = self.executor.submit(self.process_file, (root, file))
+                future.add_done_callback(lambda f: pool_callback(f.result(), pbar))
+                futures.append(future)
 
-            pool.close()
-            pool.join()
+            wait(futures)
 
         logging.top('Organizing files finished.')
 
@@ -297,16 +301,20 @@ class MPORG:
             if source not in self.file_locks:
                 self.file_locks[source] = Lock()
 
-            try:
-                with self.file_locks[source]:
-                    shutil.copyfile(source, destination)
-            except (OSError, IOError):
+            retries = 3  # Maximum number of retries
+            for _ in range(retries):
                 try:
-                    os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
-                    with self.file_locks[source]:
+                    with self.file_locks[source], self.file_locks[destination]:
+                        os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
                         shutil.copyfile(source, destination)
+                    break  # Copying succeeded, exit the loop
                 except (OSError, IOError) as e:
-                    logging.exception(e)
+                    logging.warning(f"Error copying file: {e}")
+                    time.sleep(1)  # Wait for 1 second before retrying
+            else:
+                logging.error(f"Failed to copy file after {retries} retries: {source}")
+        else:
+            logging.warning(f"Destination file already exists: {destination}")
 
     def update_metadata_from_spotify(self, location: Path, results: Track) -> None:
         """
