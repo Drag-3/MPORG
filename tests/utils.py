@@ -1,3 +1,6 @@
+from concurrent.futures import Future, ThreadPoolExecutor
+from unittest.mock import MagicMock
+
 from mporg import organizer, spotify_searcher, audio_fingerprinter
 
 
@@ -62,3 +65,30 @@ class MockPool:
 
     def join(self):
         pass
+
+
+class MockThreadPoolExecutor(ThreadPoolExecutor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def submit(self, func, *args, **kwargs):
+        return MockFuture(func(*args, **kwargs))
+
+
+class MockFuture(Future):
+    def __init__(self, result=None):
+        super().__init__()
+        self.f_result = result
+        self.callback = None
+
+    def set_result(self, result):
+        self.f_result = result
+        super().set_result(result)
+
+    def result(self, timeout=None):
+        self.set_result(self.f_result)
+        return self.result
+
+    def add_done_callback(self, func):
+        func(self)
+

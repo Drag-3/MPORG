@@ -1,13 +1,18 @@
 import logging
+import os
+import threading
 import unittest
-from unittest.mock import patch, call, Mock, MagicMock
+from unittest.mock import patch, call, Mock, MagicMock, ANY
 from pathlib import Path
 
 from parameterized import parameterized
 
 import mporg.main
 import mporg.organizer as mp
+from mporg.logging_utils.logging_setup import setup_logging
+
 from tests import utils
+from tests.utils import MockThreadPoolExecutor
 
 
 class TestMPORGHelpers(unittest.TestCase):
@@ -261,14 +266,16 @@ class TestMPORG(unittest.TestCase):
         actual_path = self.org.get_location(results, tags_from, dummy_tagger, ext, file)
         self.assertEqual(actual_path, expected_path)
 
+    @patch('os.makedirs')
     @patch('shutil.copyfile')
-    def test_copy_file(self, mock_copyfile):
+    def test_copy_file(self, mock_copyfile, mock_mkdirs):
         source = Path('source.txt')
         destination = Path('destination.txt')
 
         self.org.copy_file(source, destination)
 
         mock_copyfile.assert_called_once_with(source, destination)
+        mock_mkdirs.assert_called_once_with(os.path.dirname(destination), exist_ok=True, mode=0o777)
 
     @patch('mporg.organizer.Tagger')
     def test_update_metadata_from_spotify(self, mock_tagger):
@@ -278,7 +285,7 @@ class TestMPORG(unittest.TestCase):
                            album_artists=['Test Artist'], track_bpm='120', track_key='C',
                            album_genres='Rock')
 
-        self.org.update_metadata_from_spotify(location, results)
+        self.org.update_metadata_from_spotify(threading.Lock(), location, results)
 
         mock_tagger.assert_called_once_with(location)
         mock_tagger.return_value.assert_has_calls([
@@ -306,7 +313,7 @@ class TestMPORG(unittest.TestCase):
                            album_artists=['Test Artist'], track_bpm='120', track_key='C',
                            album_genres='Rock', track_year='2023')
 
-        self.org.update_metadata_from_fingerprinter(location, results)
+        self.org.update_metadata_from_fingerprinter(threading.Lock(), location, results)
 
         mock_tagger.assert_called_once_with(location)
         mock_tagger.return_value.assert_has_calls([
@@ -325,7 +332,7 @@ class TestMPORGWithMocks(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        mporg.main.set_logging(False)
+        setup_logging(0)
 
     def setUp(self):
         logging.disable(logging.CRITICAL)
@@ -363,7 +370,7 @@ class TestMPORGWithMocks(unittest.TestCase):
         # self.mporg.get_metadata.assert_called_once_with(tag, Path(root, file))
         self.mporg.copy_file.assert_called_once_with(Path(root, file), self.store / 'Test Artist' / '2023 - Test Album'
                                                      / '1. - Test Artist - Test Track.mp3')
-        self.mporg.update_metadata_from_spotify.assert_called_once_with(self.store / 'Test Artist' / '2023 - Test Album'
+        self.mporg.update_metadata_from_spotify.assert_called_once_with(ANY, self.store / 'Test Artist' / '2023 - Test Album'
                                                                         / '1. - Test Artist - Test Track.mp3',
                                                                         spotifyRes)
 
@@ -374,11 +381,12 @@ class TestMPORGWithMocks(unittest.TestCase):
 
         self.mporg.get_file_count = MagicMock(return_value=2)
         self.mporg.process_file = MagicMock()
+        self.mporg.executor = MockThreadPoolExecutor()
 
         with unittest.mock.patch('os.walk', file_generator_mock):
             with unittest.mock.patch('mporg.organizer.get_file_count', self.mporg.get_file_count):
-                with unittest.mock.patch('multiprocessing.pool.Pool', utils.MockPool):
-                    self.mporg.organize()
+                    with unittest.mock.patch('concurrent.futures.wait', MagicMock):
+                        self.mporg.organize()
 
         file_generator_mock.assert_called_once_with(self.search)
         self.mporg.get_file_count.assert_called_once_with(self.search)

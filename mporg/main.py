@@ -14,7 +14,7 @@ from mporg.spotify_searcher import SpotifySearcher
 
 def main():
     arg_parser = ArgumentParser()
-    arg_parser.add_argument("-v", "--version", help="Show the version of MPORG.", action="store_true")
+    arg_parser.add_argument("-v", "--version", help="Show the version of MPORG and exit.", action="store_true")
     arg_parser.add_argument("-l", "--log_level", help="Logging level for the console screen", type=int, default=3)
     arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud for audio fingerprinting.", action="store_true")
     arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.", action="store_true")
