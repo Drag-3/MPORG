@@ -1,13 +1,17 @@
-
 import enum
 import logging
 import os
+import random
+import threading
+from contextlib import ExitStack
+from functools import wraps
 from threading import Lock
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 import shutil
 
+from mutagen.id3 import ID3NoHeaderError
 from tqdm import tqdm
 
 import mutagen
@@ -22,6 +26,39 @@ from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
 logging.getLogger('__main__.' + __name__)
 logging.propagate = True
+
+
+def wait_if_locked(timeout):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            lock = None
+            func_args = args
+
+            for arg in args:
+                if isinstance(arg, type(Lock())):
+                    lock = arg
+                    func_args = tuple(arg for arg in args if arg is not lock)
+                    break
+
+            if lock is None:
+                raise ValueError("No Lock object found in arguments.")
+
+            acquired = lock.acquire(timeout=timeout)
+
+            if acquired:
+                try:
+                    result = func(*func_args, **kwargs)
+                finally:
+                    lock.release()
+
+            else:
+                raise TimeoutError(f"Timeout occurred while waiting for lock '{lock}'")
+
+            return result
+
+        return wrapper
+
+    return decorator
 
 
 class Tagger:
@@ -41,7 +78,12 @@ class Tagger:
         # Determine mutagen object to use
         extension = file.suffix
         if extension.lower() == ".mp3":
-            self.tagger = EasyID3(file)
+            try:
+                self.tagger = EasyID3(file)
+            except ID3NoHeaderError:
+                self.tagger = mutagen.File(file, easy=True)
+                self.tagger.add_tags()
+
         elif extension.lower() == ".m4a":
             self.tagger = EasyMP4(file)
         elif extension.lower() == ".wav":
@@ -96,6 +138,21 @@ def pool_callback(result, pbar):
         logging.warning(result)
 
 
+def save_metadata(tagger: Tagger):
+    retries = 3
+    for _ in range(retries):
+        try:
+            tagger.save()
+            break
+        except mutagen.MutagenError:
+            time.sleep(random.randint(1, 3))
+    else:
+        try:
+            tagger.save()
+        except mutagen.MutagenError as e:
+            logging.exception(f"Unhandled MutagenError {e}")
+
+
 class MPORG:
 
     def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]):
@@ -109,6 +166,7 @@ class MPORG:
     def process_file(self, args):
         root, file = args
         try:
+            logging.info(f"Organizing: {os.path.join(root, file)}")
             path = Path(os.path.join(root, file))
             try:
                 metadata = Tagger(path)
@@ -121,15 +179,18 @@ class MPORG:
 
             self.copy_file(path, location)
 
+            lock = self.get_lock(location)
             if tags_from == TagType.SPOTIFY:
-                self.update_metadata_from_spotify(location, results)
+                self.update_metadata_from_spotify(lock, location, results)
             elif tags_from == TagType.FINGERPRINTER:
-                self.update_metadata_from_fingerprinter(location, results)
+                self.update_metadata_from_fingerprinter(lock, location, results)
 
             return None
         except ValueError as e:
+            #logging.exception(e)
             return f"Error processing file {file}: {e}"
-        except BaseException as e:
+        except Exception as e:
+            #logging.exception(e)
             return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
@@ -154,8 +215,8 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        artist = [u.replace('\x00', '') for u in metadata.get('artist', '')]  # Replace Null Bytes
-        title = [u.replace('\x00', '') for u in metadata.get('title', '')]
+        artist = [str(u).replace('\x00', '') for u in metadata.get('artist', '')]  # Replace Null Bytes
+        title = [str(u).replace('\x00', '') for u in metadata.get('title', '')]
         if len(artist) == 1:
             artist = "".join(artist)
         if len(title) == 1:
@@ -300,11 +361,20 @@ class MPORG:
 
             if source not in self.file_locks:
                 self.file_locks[source] = Lock()
+            if destination not in self.file_locks:
+                self.file_locks[destination] = Lock()
+            if destination.parent.absolute() not in self.file_locks:
+                self.file_locks[destination.parent.absolute()] = Lock()
 
+            locks = (self.file_locks[source],
+                     self.file_locks[destination.parent.absolute()],
+                     self.file_locks[destination])
             retries = 3  # Maximum number of retries
             for _ in range(retries):
                 try:
-                    with self.file_locks[source], self.file_locks[destination]:
+                    with ExitStack() as stack:
+                        for lock in locks:
+                            stack.enter_context(lock)
                         os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
                         shutil.copyfile(source, destination)
                     break  # Copying succeeded, exit the loop
@@ -314,8 +384,15 @@ class MPORG:
             else:
                 logging.error(f"Failed to copy file after {retries} retries: {source}")
         else:
-            logging.warning(f"Destination file already exists: {destination}")
+            logging.info(f"Destination file already exists:{source} -> {destination}")
 
+    def get_lock(self, path: Path) -> Lock:
+        if path not in self.file_locks:
+            self.file_locks[path] = Lock()
+
+        return self.file_locks[path]
+
+    @wait_if_locked(5)
     def update_metadata_from_spotify(self, location: Path, results: Track) -> None:
         """
         Update file metadata with Spotify results
@@ -323,8 +400,6 @@ class MPORG:
         :param results:
         :return:
         """
-        if location not in self.file_locks:
-            self.file_locks[location] = Lock()
 
         metadata = Tagger(location)
         metadata['title'] = results.track_name
@@ -342,15 +417,11 @@ class MPORG:
         except TypeError:
             pass
         metadata['genre'] = results.album_genres
-        try:
-            with self.file_locks[location]:
-                metadata.save()
-        except mutagen.MutagenError as e:
-            logging.exception(e)
 
+        save_metadata(metadata)
+
+    @wait_if_locked(5)
     def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
-        if location not in self.file_locks:
-            self.file_locks[location] = Lock()
 
         metadata = Tagger(location)
         metadata['title'] = results.track_name
@@ -368,11 +439,8 @@ class MPORG:
             metadata['genre'] = results.album_genres
         except ValueError:
             pass
-        try:
-            with self.file_locks[location]:
-                metadata.save()
-        except mutagen.MutagenError as e:
-            logging.exception(e)
+
+        save_metadata(metadata)
 
 
 def _remove_invalid_path_chars(s: str) -> str:

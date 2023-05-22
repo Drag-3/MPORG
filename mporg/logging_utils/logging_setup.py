@@ -76,7 +76,7 @@ def setup_logging(log_lvl_input: int):
         log_level_input = 5
 
     log_lvl = log_lvl_input * 10
-    logger.setLevel(log_lvl)
+    logger.setLevel(1)
 
     if not CONFIG_DIR.exists():
         os.mkdir(CONFIG_DIR)
@@ -90,7 +90,7 @@ def setup_logging(log_lvl_input: int):
     formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
     # Create a file handler and set the formatter
     file_handler = RotatingFileHandler(LOG_DIR / 'MPORG.log', maxBytes=1000000, backupCount=5, encoding='utf-8')
-    file_handler.setLevel(logging.INFO if log_lvl > logging.INFO else log_lvl)
+    file_handler.setLevel(logging.DEBUG if log_lvl <= logging.DEBUG else logging.INFO)
     file_handler.setFormatter(formatter)
 
     # Create a console handler and set the formatter

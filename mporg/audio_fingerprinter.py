@@ -125,7 +125,7 @@ class MBFingerprinter(Fingerprinter):
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
             api_result = lookup(self.api_key, fingerprint, duration, meta='recordings')
         except FingerprintGenerationError as e:
-            logging.exception(f"Error recognizing fingerprint: {e}")
+            logging.info(f"Error recognizing fingerprint: {e}")
             return FingerprintResult(code=9, type="fail")
 
         out = FingerprintResult()
@@ -153,7 +153,7 @@ class MBFingerprinter(Fingerprinter):
             m_response = musicbrainzngs.get_recording_by_id(release_id,
                                                             includes=['url-rels', 'artists', 'tags', 'releases'])
         except musicbrainzngs.WebServiceError as exc:
-            logging.warning(f"Error fetching release info from MusicBrainz: {exc}")
+            logging.info(f"Error fetching release info from MusicBrainz: {exc}")
             out.type = "fail"
             out.code = 3
             return out
@@ -182,7 +182,7 @@ class MBFingerprinter(Fingerprinter):
         release_info = [r for r in recording_info.get('release-list', []) if isinstance(r, dict)]
 
         if not release_info:
-            logging.warning("Musicbrainz did not return any album information")
+            logging.info("Musicbrainz did not return any album information")
             out.type = "fail"
             out.code = 9
             self.cache.set(cache_key, out)
@@ -208,7 +208,7 @@ class MBFingerprinter(Fingerprinter):
 
         album_artists = artists
         if not all((track, artists, album_artists, album)) or date == '0':
-            logging.warning("Musicbrainz did not return enough metadata")
+            logging.info("Musicbrainz did not return enough metadata")
             out.type = "fail"
             out.code = 15
             self.cache.set(cache_key, out)
