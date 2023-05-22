@@ -1,146 +1,15 @@
 import logging
 import os
 import sys
-from logging.handlers import RotatingFileHandler
 import json
 from argparse import ArgumentParser
 from pathlib import Path
 
-import tqdm
-
-import mporg
-from mporg import CONFIG_DIR, VERSION, LOG_DIR
+from mporg import CONFIG_DIR, VERSION
 from mporg.organizer import MPORG
 from mporg.audio_fingerprinter import ACRFingerprinter, MBFingerprinter
 from mporg.spotify_searcher import SpotifySearcher
-
-
-class ColoredFormatter(logging.Formatter):
-    """
-    A formatter that adds color to the log output.
-    """
-
-    def format(self, record):
-        if record.levelno == logging.DEBUG:
-            record.levelname = f"\033[34m{record.levelname}\033[0m"
-        elif record.levelno == logging.INFO:
-            record.levelname = f"\033[32m{record.levelname}\033[0m"
-        elif record.levelno == logging.WARNING:
-            record.levelname = f"\033[33m{record.levelname}\033[0m"
-        elif record.levelno == logging.ERROR:
-            record.levelname = f"\033[31m{record.levelname}\033[0m"
-        elif record.levelno == logging.CRITICAL:
-            record.levelname = f"\033[35m{record.levelname}\033[0m"
-        return super().format(record)
-
-
-class ColorHandler(logging.StreamHandler):
-    # https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
-    GRAY8 = "38;5;8"
-    GRAY7 = "38;5;7"
-    ORANGE = "33"
-    RED = "31"
-    WHITE = "0"
-
-    def emit(self, record):
-        # Don't use white for any logging, to help distinguish from user print statements
-        level_color_map = {
-            logging.DEBUG: self.GRAY8,
-            logging.INFO: self.GRAY7,
-            logging.WARNING: self.ORANGE,
-            logging.ERROR: self.RED,
-        }
-
-        csi = f"{chr(27)}["  # control sequence introducer
-        color = level_color_map.get(record.levelno, self.WHITE)
-        try:
-            tqdm.tqdm.write(f"{csi}{color}m{self.format(record)}{csi}m", file=sys.stderr)
-            self.flush()
-        except Exception:
-            self.handleError(record)
-
-
-def addLoggingLevel(levelName, levelNum, methodName=None):
-    """
-    https://stackoverflow.com/a/35804945
-    Comprehensively adds a new logging level to the `logging` module and the
-    currently configured logging class.
-
-    `levelName` becomes an attribute of the `logging` module with the value
-    `levelNum`. `methodName` becomes a convenience method for both `logging`
-    itself and the class returned by `logging.getLoggerClass()` (usually just
-    `logging.Logger`). If `methodName` is not specified, `levelName.lower()` is
-    used.
-
-    To avoid accidental clobberings of existing attributes, this method will
-    raise an `AttributeError` if the level name is already an attribute of the
-    `logging` module or if the method name is already present
-
-    Example
-    -------
-    >>> addLoggingLevel('TRACE', logging.DEBUG - 5)
-    >>> logging.getLogger(__name__).setLevel("TRACE")
-    >>> logging.getLogger(__name__).trace('that worked')
-    >>> logging.trace('so did this')
-    >>> logging.TRACE
-    5
-
-    """
-    if not methodName:
-        methodName = levelName.lower()
-
-    if hasattr(logging, levelName):
-        raise AttributeError('{} already defined in logging module'.format(levelName))
-    if hasattr(logging, methodName):
-        raise AttributeError('{} already defined in logging module'.format(methodName))
-    if hasattr(logging.getLoggerClass(), methodName):
-        raise AttributeError('{} already defined in logger class'.format(methodName))
-
-    # This method was inspired by the answers to Stack Overflow post
-    # http://stackoverflow.com/q/2183233/2988730, especially
-    # http://stackoverflow.com/a/13638084/2988730
-    def logForLevel(self, message, *args, **kwargs):
-        if self.isEnabledFor(levelNum):
-            self._log(levelNum, message, args, **kwargs)
-
-    def logToRoot(message, *args, **kwargs):
-        logging.log(levelNum, message, *args, **kwargs)
-
-    logging.addLevelName(levelNum, levelName)
-    setattr(logging, levelName, levelNum)
-    setattr(logging.getLoggerClass(), methodName, logForLevel)
-    setattr(logging, methodName, logToRoot)
-
-
-def set_logging(v: bool):
-    # Set up logging
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG if v else logging.INFO)
-
-    if not CONFIG_DIR.exists():
-        os.mkdir(CONFIG_DIR)
-        logging.debug(f"Creating {CONFIG_DIR}")
-    if not LOG_DIR.exists():
-        LOG_DIR.mkdir()
-
-    addLoggingLevel("TOP", logging.CRITICAL - 1)
-    # Create a formatter
-    c_formatter = ColoredFormatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
-    formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
-    # Create a file handler and set the formatter
-    file_handler = RotatingFileHandler(LOG_DIR / 'MPORG.log', maxBytes=1000000, backupCount=5, encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG if v else logging.INFO)
-    file_handler.setFormatter(formatter)
-
-    # Create a console handler and set the formatter
-    console_handler = ColorHandler()
-    #console_handler.stream = sys.stderr
-    console_handler.setLevel(logging.DEBUG if v else logging.TOP)
-    console_handler.setFormatter(c_formatter)
-
-    # Add both handlers to the logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+from mporg.logging_utils.logging_setup import setup_logging
 
 
 def get_credentials(use_acr: bool = False, use_mb: bool = False):
@@ -279,7 +148,7 @@ def get_acrcloud_credentials(acrcred):
 def main():
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-v", "--version", help="Show the version of MPORG.", action="store_true")
-    arg_parser.add_argument("-V", "--verbose", help="Print detailed output during execution.", action="store_true")
+    arg_parser.add_argument("-l", "--log_level", help="Logging level for the console screen", type=int, default=3)
     arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud for audio fingerprinting.", action="store_true")
     arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.", action="store_true")
     arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters (same as -am).", action="store_true")
@@ -289,7 +158,8 @@ def main():
     arg_parser.add_argument("search_path", default=Path.cwd(), help="Source dir to look for mp3 files in.", nargs='?')
 
     args = arg_parser.parse_args()
-    set_logging(args.verbose)
+
+    setup_logging(args.log_level)
     logging.debug(args)
 
     if args.version:
