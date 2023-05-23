@@ -122,13 +122,17 @@ def file_generator(search):
             yield root, file
 
 
-def get_file_count(path):
+def get_file_count(path, pbar=None):
     file_count = 0
+    if pbar is None:
+        pbar = tqdm(desc="Scanning Search Directory", unit=" file")
+
     for entry in os.scandir(path):
         if entry.is_file():
             file_count += 1
+            pbar.update(1)
         elif entry.is_dir():
-            file_count += get_file_count(entry.path)
+            file_count += get_file_count(entry.path, pbar)
     return file_count
 
 
@@ -197,7 +201,7 @@ class MPORG:
         logging.top('Organizing files...')
         file_count = get_file_count(self.search)
 
-        with tqdm(total=file_count, unit="file", miniters=0) as pbar:
+        with tqdm(desc="Organizing", total=file_count, unit="file", miniters=0) as pbar:
             futures = []
             for root, file in file_generator(self.search):
                 future = self.executor.submit(self.process_file, (root, file))

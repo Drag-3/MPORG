@@ -5,6 +5,7 @@
 ### Added
 - Added credentials package and moved credentials handling logic into it.
 - Added CHANGELOG
+- Add Progress Bar for Scanning files, since it seemed a little empty
 
 ### Changed
 - Moved file processing from multiprocessing to multithreading
