@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import threading
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from functools import wraps
 from threading import Lock
 import time
@@ -28,31 +28,38 @@ logging.getLogger('__main__.' + __name__)
 logging.propagate = True
 
 
+@contextmanager
+def acquire(lock: threading.Lock, blocking=True, timeout=None):
+    held = lock.acquire(blocking=blocking, timeout=timeout)
+    if held:
+        try:
+            yield lock
+        finally:
+            lock.release()
+    else:
+        raise TimeoutError(f"Timeout occurred while waiting for lock '{lock}'")
+
+
 def wait_if_locked(timeout):
+    """
+    Tries to acquire a lock within a specified timeout before running decorated function
+    :param int timeout: Timeout to wait for (in seconds)
+    :return:
+    """
     def decorator(func):
         def wrapper(*args, **kwargs):
-            lock = None
-            func_args = args
 
-            for arg in args:
-                if isinstance(arg, type(Lock())):
-                    lock = arg
-                    func_args = tuple(arg for arg in args if arg is not lock)
-                    break
+            locks = tuple(arg for arg in args if isinstance(arg, type(Lock())))
 
-            if lock is None:
-                raise ValueError("No Lock object found in arguments.")
+            func_args = tuple(arg for arg in args if arg not in locks)
 
-            acquired = lock.acquire(timeout=timeout)
+            if locks is None:
+                raise ValueError("No Lock objects found in arguments.")
 
-            if acquired:
-                try:
-                    result = func(*func_args, **kwargs)
-                finally:
-                    lock.release()
-
-            else:
-                raise TimeoutError(f"Timeout occurred while waiting for lock '{lock}'")
+            with ExitStack() as stack:
+                for lock in locks:
+                    stack.enter_context(acquire(lock, timeout=timeout))
+                result = func(*func_args, **kwargs)
 
             return result
 
@@ -181,7 +188,9 @@ class MPORG:
             results, tags_from = self.get_metadata(metadata, path)
             location = self.get_location(results, tags_from, metadata, ext, file)
 
-            self.copy_file(path, location)
+            source_lock = self.get_lock(path)
+            destination_lock = self.get_lock(location)
+            self.copy_file(source_lock, destination_lock, path, location)
 
             lock = self.get_lock(location)
             if tags_from == TagType.SPOTIFY:
@@ -191,10 +200,10 @@ class MPORG:
 
             return None
         except ValueError as e:
-            #logging.exception(e)
+            # logging.exception(e)
             return f"Error processing file {file}: {e}"
         except Exception as e:
-            #logging.exception(e)
+            # logging.exception(e)
             return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
@@ -353,6 +362,7 @@ class MPORG:
         path /= f'{" - ".join(parts)}.{file_extension}'
         return path
 
+    @wait_if_locked(10)
     def copy_file(self, source: Path, destination: Path) -> None:
         """
         Copy the file from the source location to the destination location
@@ -363,24 +373,11 @@ class MPORG:
         if not os.path.exists(destination):
             logging.info(f"Copying {source} to {destination}")
 
-            if source not in self.file_locks:
-                self.file_locks[source] = Lock()
-            if destination not in self.file_locks:
-                self.file_locks[destination] = Lock()
-            if destination.parent.absolute() not in self.file_locks:
-                self.file_locks[destination.parent.absolute()] = Lock()
-
-            locks = (self.file_locks[source],
-                     self.file_locks[destination.parent.absolute()],
-                     self.file_locks[destination])
             retries = 3  # Maximum number of retries
             for _ in range(retries):
                 try:
-                    with ExitStack() as stack:
-                        for lock in locks:
-                            stack.enter_context(lock)
-                        os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
-                        shutil.copyfile(source, destination)
+                    os.makedirs(os.path.dirname(destination), exist_ok=True, mode=0o777)
+                    shutil.copyfile(source, destination)
                     break  # Copying succeeded, exit the loop
                 except (OSError, IOError) as e:
                     logging.warning(f"Error copying file: {e}")

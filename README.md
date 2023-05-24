@@ -3,6 +3,7 @@
 MPORG (short for MP3 ORGanizer) is a Python package designed to organize music files in a given directory.
 
 [![Python application](https://github.com/Drag-3/MP3ORG/actions/workflows/python-app.yml/badge.svg)](https://github.com/Drag-3/MP3ORG/actions/workflows/python-app.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://opensource.org/licenses/GPL-3.0)
 
 ## Table of Contents
