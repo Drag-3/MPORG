@@ -365,9 +365,11 @@ class TestMPORGWithMocks(unittest.TestCase):
         file = 'song1.mp3'
         root = self.search
         args = (root, file)
-        self.mporg.process_file(args)
 
-        # self.mporg.get_metadata.assert_called_once_with(tag, Path(root, file))
+        with patch('mporg.organizer.Tagger', return_value=tag):
+            self.mporg.process_file(args)
+
+        self.mporg.get_metadata.assert_called_once_with(tag, Path(root, file))
         self.mporg.copy_file.assert_called_once_with(ANY, ANY,  # First two will be locks for src and destination
                                                      Path(root, file),  # Source file path
                                                      self.store / 'Test Artist' / '2023 - Test Album'
