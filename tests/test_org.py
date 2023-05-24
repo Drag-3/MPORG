@@ -368,7 +368,9 @@ class TestMPORGWithMocks(unittest.TestCase):
         self.mporg.process_file(args)
 
         # self.mporg.get_metadata.assert_called_once_with(tag, Path(root, file))
-        self.mporg.copy_file.assert_called_once_with(Path(root, file), self.store / 'Test Artist' / '2023 - Test Album'
+        self.mporg.copy_file.assert_called_once_with(ANY, ANY,  # First two will be locks for src and destination
+                                                     Path(root, file),  # Source file path
+                                                     self.store / 'Test Artist' / '2023 - Test Album'
                                                      / '1. - Test Artist - Test Track.mp3')
         self.mporg.update_metadata_from_spotify.assert_called_once_with(ANY, self.store / 'Test Artist' / '2023 - Test Album'
                                                                         / '1. - Test Artist - Test Track.mp3',
