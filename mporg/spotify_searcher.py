@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from urllib.error import HTTPError
 
 import diskcache
 import spotipy as sy
@@ -19,6 +20,7 @@ PITCH_CODES = {
     9: 'A♯/B♭',
     10: 'B',
     11: 'B♯/C♭',
+    12: 'N/A'
 }
 
 logging.getLogger('__main.' + __name__)
@@ -106,8 +108,14 @@ class SpotifySearcher:
 
     def _get_track_info(self, item: dict) -> Track:
         logging.debug("Searching additional metadata")
-        audio = self.spot.audio_analysis(item["id"])
-        genres = [genre for artist in item["artists"] for genre in self.spot.artist(artist["id"])["genres"]]
+        try:
+            audio = self.spot.audio_analysis(item["id"])
+        except HTTPError:
+            audio = dict()
+        try:
+            genres = [genre for artist in item["artists"] for genre in self.spot.artist(artist["id"])["genres"]]
+        except HTTPError:
+            genres = []
 
         return Track(
             track_name=item['name'],
@@ -115,8 +123,8 @@ class SpotifySearcher:
             track_year=item['album']["release_date"].split('-')[0],  # YYYY-MM-DD
             track_disk=int(item['disc_number']),
             track_artists=[artist['name'] for artist in item['artists']],
-            track_bpm=audio['track']['tempo'],
-            track_key=PITCH_CODES[audio['track']['key']],
+            track_bpm=audio.get('track', {}).get('tempo'),
+            track_key=PITCH_CODES[audio.get('track', {}).get('key', 12)],
 
             album_name=item['album']['name'],
             album_year=item['album']["release_date"].split('-')[0],  # YYYY-MM-DD
