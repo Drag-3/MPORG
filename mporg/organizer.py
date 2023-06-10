@@ -2,9 +2,11 @@ import enum
 import logging
 import os
 import random
+import sys
 import threading
 from contextlib import ExitStack, contextmanager
 from functools import wraps
+from math import ceil
 from threading import Lock
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -46,6 +48,7 @@ def wait_if_locked(timeout):
     :param int timeout: Timeout to wait for (in seconds)
     :return:
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
 
@@ -301,14 +304,14 @@ class MPORG:
             return self.metadata_location(metadata, ext, file)
 
     def spotify_location(self, results: Track, ext: str) -> Path:
-        album_artist, album_name, track_artist, track_name = _sanitize_results(results)
+        album_artist, album_name, track_artist, track_name = _sanitize_results(self.store, results)
 
         return self.store / album_artist / \
             f"{results.album_year} - {album_name.strip()}" / \
             f"{results.track_number}. - {track_artist} - {track_name}.{ext}"
 
     def fingerprinter_location(self, results: Track, ext: str) -> Path:
-        album_artist, album_name, track_artist, track_name = _sanitize_results(results)
+        album_artist, album_name, track_artist, track_name = _sanitize_results(self.store, results)
 
         return self.store / album_artist / \
             (f"{results.track_year} - " + f"{album_name}" if results.track_year else f"{album_name}") / \
@@ -449,29 +452,49 @@ def _remove_invalid_path_chars(s: str) -> str:
     return ''.join(c for c in s if c not in INVALID_PATH_CHARS)
 
 
-def _sanitize_results(results: Track) -> (str, str, str, str):
+def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     """
-    # Sanitize the strings and limit the total length of the sanitized results to ~190 characters
-    # to ensure compatibility with both Windows (256-character limit) and Linux (4096-character limit) path lengths.
-    # Leave room for a 66-character root directory.
+    # Sanitize the strings and limit the total length of the sanitized results to a size which fits in MATH_PATH
+    # for the current system. (Works for Unix & Windows)
     :param results:
     :return: tuple of sanitized and truncated album_artist, album_name, track_artist, track_name
+    """
+
+    # Get Path max and File max
+
+    if sys.platform == "linux":  # Use Linux stuff:
+        path_max = os.pathconf('/', "PC_PATH_MAX")
+    else:  # Assume Windows as it has a lower path max
+        from ctypes.wintypes import MAX_PATH
+        path_max = MAX_PATH
+
+    path_max -= 5  # Buffer for ceil function
+    path_max -= len(str(root))  # Subtract length of store root from the max.
+
+    artist_max = ceil(path_max * 0.20)
+    name_max = ceil(path_max * 0.30)
+    """
+    Paths are organized as such
+    [Store root][Artist][Album info][Track info]
+    
+    Then give 20% to each artist block
+    and 30% to the album and track block
     """
     album_artist = ", ".join(results.album_artists)
     track_artist = ", ".join(results.track_artists)
 
-    track_artist = _remove_invalid_path_chars(track_artist)[:30].strip()
-    album_artist = _remove_invalid_path_chars(album_artist)[:30].strip()
+    track_artist = _remove_invalid_path_chars(track_artist)[:artist_max].strip()
+    album_artist = _remove_invalid_path_chars(album_artist)[:artist_max].strip()
 
-    album_name = _remove_invalid_path_chars(results.album_name)[:50].strip()
-    track_name = _remove_invalid_path_chars(results.track_name)[:50].strip()
+    album_name = _remove_invalid_path_chars(results.album_name)[:name_max].strip()
+    track_name = _remove_invalid_path_chars(results.track_name)[:name_max].strip()
 
     # Calculate the total length of the sanitized results
     total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
 
-    # If the total length exceeds 190 characters, truncate the longest string(s)
-    if total_length > 190:
-        while total_length > 190:
+    # If the total length exceeds path_max, truncate the longest string(s)
+    if total_length > path_max:
+        while total_length > path_max:
             if len(album_name) > len(track_name):
                 album_name = album_name[:-1].strip()
             else:
