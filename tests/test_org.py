@@ -2,9 +2,10 @@ import logging
 import os
 import threading
 import unittest
+from math import ceil
 from unittest.mock import patch, call, Mock, MagicMock, ANY
 from pathlib import Path
-
+import sys
 from parameterized import parameterized
 
 import mporg.main
@@ -16,6 +17,24 @@ from tests.utils import MockThreadPoolExecutor
 
 
 class TestMPORGHelpers(unittest.TestCase):
+    if sys.platform == "linux":  # Use Linux stuff:
+        path_max = os.pathconf('/', "PC_PATH_MAX")
+    else:  # Assume Windows as it has a lower path max
+        from ctypes.wintypes import MAX_PATH
+        path_max = MAX_PATH
+    path_max -= 5  # Buffer for ceil function
+    path_max -= 4
+    max_segment = 255 // 2 - 7
+
+    # Calculate maximum lengths for artist and name segments
+    segment_max = ceil(path_max * 0.20)
+    artist_max = min(max_segment, segment_max)
+
+    segment_max = ceil(path_max * 0.30)
+    name_max = min(max_segment, segment_max)
+
+    long_message = "x" * path_max
+
     @parameterized.expand([
         ("No Invalid", "qwerty", "qwerty"),
         ("One Invalid", "qwe?rty", "qwerty"),
@@ -35,29 +54,29 @@ class TestMPORGHelpers(unittest.TestCase):
         ("Long Album Name",
          mp.Track(album_artists=["Artist1", "Artist2"],
                   track_artists=["Artist3"],
-                  album_name="Very Long Album Name That Exceeds 50 Characters It Does I swear",
+                  album_name=long_message + "This is above",
                   track_name="Track Name"),
-         ("Artist1, Artist2", "Very Long Album Name That Exceeds 50 Characters It", "Artist3", "Track Name")),
+         ("Artist1, Artist2", 'x' * name_max, "Artist3", "Track Name")),
         ("Long Track Name",
          mp.Track(album_artists=["Artist1", "Artist2"],
                   track_artists=["Artist3"],
                   album_name="Album Name",
-                  track_name="Very Long Track Name That Exceeds 50 Characters It Does I swear"),
-         ("Artist1, Artist2", "Album Name", "Artist3", "Very Long Track Name That Exceeds 50 Characters It")),
+                  track_name=long_message + "This is above"),
+         ("Artist1, Artist2", "Album Name", "Artist3", name_max)),
         ("Long Track and Album",
-         mp.Track(album_artists=["Artist1" * 10],  # 70 characters
-                  track_artists=["Artist2" * 10],  # 70 characters
-                  album_name="Album Name",  # 10 characters
-                  track_name="Track Name"),  # 10 characters
-         (("Artist1" * 5)[:30],  # 30 characters
-          "Album Name",  # 10 characters
-          ("Artist2" * 5)[:30],  # 30 characters
-          "Track Name"  # 10 characters
+         mp.Track(album_artists=["Artist1" * path_max],  # Much larger thna path max
+                  track_artists=["Artist2" * path_max],
+                  album_name=long_message,  # 10 characters
+                  track_name=long_message),  # 10 characters
+         (("Artist1" * 24)[artist_max],  # 30 characters
+          "x" * name_max,  # 10 characters
+          ("Artist2" * 20)[artist_max],  # 30 characters
+          "x" * name_max  # 10 characters
           ))
 
     ])
     def test_sanitize_results(self, name, track, expected_tuple):
-        self.assertEqual(mp._sanitize_results(track), expected_tuple)
+        self.assertEqual(mp._sanitize_results(Path('Test'), track), expected_tuple)
 
 
 class TestMPORG(unittest.TestCase):
@@ -374,7 +393,8 @@ class TestMPORGWithMocks(unittest.TestCase):
                                                      Path(root, file),  # Source file path
                                                      self.store / 'Test Artist' / '2023 - Test Album'
                                                      / '1. - Test Artist - Test Track.mp3')
-        self.mporg.update_metadata_from_spotify.assert_called_once_with(ANY, self.store / 'Test Artist' / '2023 - Test Album'
+        self.mporg.update_metadata_from_spotify.assert_called_once_with(ANY,
+                                                                        self.store / 'Test Artist' / '2023 - Test Album'
                                                                         / '1. - Test Artist - Test Track.mp3',
                                                                         spotifyRes)
 
@@ -389,8 +409,8 @@ class TestMPORGWithMocks(unittest.TestCase):
 
         with unittest.mock.patch('os.walk', file_generator_mock):
             with unittest.mock.patch('mporg.organizer.get_file_count', self.mporg.get_file_count):
-                    with unittest.mock.patch('concurrent.futures.wait', MagicMock):
-                        self.mporg.organize()
+                with unittest.mock.patch('concurrent.futures.wait', MagicMock):
+                    self.mporg.organize()
 
         file_generator_mock.assert_called_once_with(self.search)
         self.mporg.get_file_count.assert_called_once_with(self.search)

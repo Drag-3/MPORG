@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 import shutil
 
+from mutagen.flac import FLAC
 from mutagen.id3 import ID3NoHeaderError
 from tqdm import tqdm
 
@@ -100,6 +101,8 @@ class Tagger:
             self.tagger = WAVE(file)
         elif extension.lower() in [".wma"]:
             self.tagger = ASF(file)
+        elif extension.lower() == ".flac":
+            self.tagger = FLAC(file)
         else:
             logging.warning(f"{file} has invalid extension {extension}")
             raise ValueError("Invalid Extension")
@@ -456,6 +459,8 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     """
     # Sanitize the strings and limit the total length of the sanitized results to a size which fits in MATH_PATH
     # for the current system. (Works for Unix & Windows)
+    # Keep in mind the max FILENAME is 255 chars for Unix though the max PATH is 4096, so unless the root is massive
+    # 99% of the path should be unused
     :param results:
     :return: tuple of sanitized and truncated album_artist, album_name, track_artist, track_name
     """
@@ -471,8 +476,15 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     path_max -= 5  # Buffer for ceil function
     path_max -= len(str(root))  # Subtract length of store root from the max.
 
-    artist_max = ceil(path_max * 0.20)
-    name_max = ceil(path_max * 0.30)
+    max_segment = 255 // 2 - 7
+
+    # Calculate maximum lengths for artist and name segments
+    segment_max = ceil(path_max * 0.20)
+    artist_max = min(max_segment, segment_max)
+
+    segment_max = ceil(path_max * 0.30)
+    name_max = min(max_segment, segment_max)
+
     """
     Paths are organized as such
     [Store root][Artist][Album info][Track info]

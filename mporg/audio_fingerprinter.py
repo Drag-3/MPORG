@@ -24,6 +24,15 @@ class Fingerprinter:
         pass
 
 
+def get_fingerprinter(name: str, data) -> Fingerprinter:
+    if name == "ACRCloud":
+        return ACRFingerprinter(data)
+    elif name == "AcoustID":
+        return MBFingerprinter(data)
+    else:
+        raise AttributeError("Invalid Fingerprinter Type")
+
+
 class ACRFingerprinter(Fingerprinter):
     def __init__(self, config: dict):
         self.acrcloud = ACRCloudRecognizer(config)
@@ -107,11 +116,11 @@ class ACRFingerprinter(Fingerprinter):
 
 
 class MBFingerprinter(Fingerprinter):
-    def __init__(self, mbid):
+    def __init__(self, config):
         musicbrainzngs.set_useragent(app="python-MPORG", version=VERSION, contact="juserysthee@gmail.com")
         self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "audiocache_M"))
         self.cache.expire(60 * 60 * 12)  # Set the cache to expire in 12 hours
-        self.api_key = mbid
+        self.api_key = config.get('api')
         musicbrainzngs.set_rate_limit(False)
 
     def fingerprint(self, path_to_fingerprint: Path) -> 'FingerprintResult':
