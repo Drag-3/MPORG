@@ -29,6 +29,7 @@ from mporg.spotify_searcher import SpotifySearcher, Track
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 
 INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
+SUPPORTED_FILETYPES = [".mp3", ".wav", ".flac", ".ogg", ".wma", ".m4a", ".oga"]
 logging.getLogger('__main__.' + __name__)
 logging.propagate = True
 
@@ -105,7 +106,7 @@ class Tagger:
             self.tagger = ASF(file)
         elif extension.lower() == ".flac":
             self.tagger = FLAC(file)
-        elif extension.lower() == ".ogg":
+        elif extension.lower() in [".ogg", ".oga"]:
             self.tagger = mutagen.File(file)  # Cannot tell if Opus Vorbis or other based on extension alone.
         else:
             logging.warning(f"{file} has invalid extension {extension}")
@@ -133,10 +134,10 @@ class TagType(enum.Enum):
     METADATA = 2
 
 
-def file_generator(search):
+def file_generator(search: Path) -> (Path, Path):
     for root, _, files in os.walk(search):
         for file in files:
-            yield root, file
+            yield Path(root), Path(file)
 
 
 def get_file_count(path, pbar=None):
@@ -188,14 +189,14 @@ class MPORG:
     def process_file(self, args):
         root, file = args
         try:
-            logging.info(f"Organizing: {os.path.join(root, file)}")
-            path = Path(os.path.join(root, file))
+            logging.info(f"Organizing: {str(root / file)}")
+            path = root / file
             try:
                 metadata = Tagger(path)
             except mutagen.MutagenError:
                 metadata = {}
 
-            ext = file.split('.')[-1]
+            ext = file.suffix
             results, tags_from = self.get_metadata(metadata, path)
             location = self.get_location(results, tags_from, metadata, ext, file)
 
@@ -224,12 +225,17 @@ class MPORG:
         with tqdm(desc="Organizing", total=file_count, unit="file", miniters=0) as pbar:
             futures = []
             for root, file in file_generator(self.search):
-                if not self.pattern or self.pattern and any(item in file for item in self.pattern):
+                if file.suffix.lower() not in SUPPORTED_FILETYPES:  # Skip all unrecognized files straight away
+                    logging.info(f"{str(file)} has unsupported type")
+                    pbar.update(1)
+                    continue
+                if not self.pattern or self.pattern and any(item in file.suffix for item in self.pattern):  # Check
+                    # pattern
                     future = self.executor.submit(self.process_file, (root, file))
                     future.add_done_callback(lambda f: pool_callback(f.result(), pbar))
                     futures.append(future)
                 else:
-                    logging.info(f"{file} does not match any pattern {self.pattern}")
+                    logging.info(f"{str(file)} does not match any pattern {self.pattern}")
                     pbar.update(1)
             wait(futures)
 
@@ -297,7 +303,7 @@ class MPORG:
             return results
         return None
 
-    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, ext: str, file: str) -> Path:
+    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, ext: str, file: Path) -> Path:
         """
         Determine the correct location to move the file based on metadata results and source
         :param file: Filename of original file
@@ -319,23 +325,23 @@ class MPORG:
 
         return self.store / album_artist / \
             f"{results.album_year} - {album_name.strip()}" / \
-            f"{results.track_number}. - {track_artist} - {track_name}.{ext}"
+            f"{results.track_number}. - {track_artist} - {track_name}{ext}"
 
     def fingerprinter_location(self, results: Track, ext: str) -> Path:
         album_artist, album_name, track_artist, track_name = _sanitize_results(self.store, results)
 
         return self.store / album_artist / \
             (f"{results.track_year} - " + f"{album_name}" if results.track_year else f"{album_name}") / \
-            f"{track_artist} - {track_name}.{ext}"
+            f"{track_artist} - {track_name}{ext}"
 
-    def metadata_location(self, metadata: Tagger, file_extension: str, file_name: str) -> Path:
+    def metadata_location(self, metadata: Tagger, file_extension: str, file: Path) -> Path:
         title = metadata.get("title")
         artist = metadata.get("artist")
         album = metadata.get("album")
 
         if not all((title, artist, album)):
-            logging.warning(f"Cannot find enough metadata to organize '{file_name}' ...")
-            return self.store / "_TaggingImpossible" / file_name
+            logging.warning(f"Cannot find enough metadata to organize '{str(file)}' ...")
+            return self.store / "_TaggingImpossible" / file
 
         track_artist = ", ".join(artist).strip()
         year = "".join(metadata.get('date', "")).strip()
@@ -373,7 +379,7 @@ class MPORG:
         if track:
             parts.append(_remove_invalid_path_chars(track))
 
-        path /= f'{" - ".join(parts)}.{file_extension}'
+        path /= f'{" - ".join(parts)}{file_extension}'
         return path
 
     @wait_if_locked(10)
