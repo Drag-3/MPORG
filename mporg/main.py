@@ -20,6 +20,8 @@ def main():
     arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.",
                             action="store_true")
     arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters (same as -am).", action="store_true")
+    arg_parser.add_argument("-p", "--pattern_extension", help="Extension(s) to copy over, space separated",
+                            default=[], nargs="*")
 
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
                             help="Root of area to store organized files", nargs='?')
@@ -29,6 +31,8 @@ def main():
 
     setup_logging(args.log_level)
     logging.debug(args)
+
+    print(args.pattern_extension)
 
     if args.version:
         print(VERSION)
@@ -44,7 +48,7 @@ def main():
     fingerprinters = [get_fingerprinter(x[0], x[1]) for x in credentials.items() if x[1] is not None]
 
     logging.info("All good, starting Organizing")
-    org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinters)
+    org = MPORG(Path(args.store_path), Path(args.search_path), spotify_searcher, fingerprinters, args.pattern_extension)
     org.organize()
 
 

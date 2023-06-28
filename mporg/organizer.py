@@ -15,6 +15,8 @@ import shutil
 
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3NoHeaderError
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
 from tqdm import tqdm
 
 import mutagen
@@ -103,6 +105,8 @@ class Tagger:
             self.tagger = ASF(file)
         elif extension.lower() == ".flac":
             self.tagger = FLAC(file)
+        elif extension.lower() == ".ogg":
+            self.tagger = mutagen.File(file)  # Cannot tell if Opus Vorbis or other based on extension alone.
         else:
             logging.warning(f"{file} has invalid extension {extension}")
             raise ValueError("Invalid Extension")
@@ -172,13 +176,14 @@ def save_metadata(tagger: Tagger):
 
 class MPORG:
 
-    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]):
+    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter], pattern: list):
         self.search = search
         self.store = store
         self.sh = searcher
         self.af = fingerprinters
         self.file_locks = {}
         self.executor = ThreadPoolExecutor()
+        self.pattern = pattern
 
     def process_file(self, args):
         root, file = args
@@ -219,10 +224,13 @@ class MPORG:
         with tqdm(desc="Organizing", total=file_count, unit="file", miniters=0) as pbar:
             futures = []
             for root, file in file_generator(self.search):
-                future = self.executor.submit(self.process_file, (root, file))
-                future.add_done_callback(lambda f: pool_callback(f.result(), pbar))
-                futures.append(future)
-
+                if not self.pattern or self.pattern and any(item in file for item in self.pattern):
+                    future = self.executor.submit(self.process_file, (root, file))
+                    future.add_done_callback(lambda f: pool_callback(f.result(), pbar))
+                    futures.append(future)
+                else:
+                    logging.info(f"{file} does not match any pattern {self.pattern}")
+                    pbar.update(1)
             wait(futures)
 
         logging.top('Organizing files finished.')
