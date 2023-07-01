@@ -5,7 +5,6 @@ import random
 import sys
 import threading
 from contextlib import ExitStack, contextmanager
-from functools import wraps
 from math import ceil
 from threading import Lock
 import time
@@ -15,8 +14,6 @@ import shutil
 
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3NoHeaderError
-from mutagen.oggopus import OggOpus
-from mutagen.oggvorbis import OggVorbis
 from tqdm import tqdm
 
 import mutagen
@@ -25,6 +22,7 @@ from mutagen.easymp4 import EasyMP4
 from mutagen.wave import WAVE
 from mutagen.asf import ASF
 
+from lyrics_searcher.lyric_finder import LyricsSearcher, write_to_file
 from mporg.spotify_searcher import SpotifySearcher, Track
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 
@@ -75,6 +73,24 @@ def wait_if_locked(timeout):
     return decorator
 
 
+def register_comment(lang='\0\0\0', desc=''):
+    "Register the comment tag"
+    frameid = ':'.join(('COMM', desc, lang))
+
+    def getter(id3, _key):
+        frame = id3.get(frameid)
+        return None if frame is None else list(frame)
+
+    def setter(id3, _key, value):
+        id3.add(mutagen.id3.COMM(
+            encoding=3, lang=lang, desc=desc, text=value))
+
+    def deleter(id3, _key):
+        del id3[frameid]
+
+    EasyID3.RegisterKey('comment', getter, setter, deleter)
+
+
 class Tagger:
     """
     Wrapper class for mutagen objects, to provide consistent api for any filetype
@@ -83,7 +99,7 @@ class Tagger:
 
     def __init__(self, file: Path):
         # Register Non-Standard Keys for Easy
-        EasyID3.RegisterTextKey("comment", "COMM")
+        register_comment()
         EasyID3.RegisterTextKey("initialkey", "TKEY")
         EasyID3.RegisterTextKey("source", "WOAS")
         EasyMP4.RegisterTextKey("source", "source")
@@ -177,7 +193,8 @@ def save_metadata(tagger: Tagger):
 
 class MPORG:
 
-    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter], pattern: list):
+    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]
+                 , pattern: list, lyrics: bool):
         self.search = search
         self.store = store
         self.sh = searcher
@@ -185,6 +202,8 @@ class MPORG:
         self.file_locks = {}
         self.executor = ThreadPoolExecutor()
         self.pattern = pattern
+        self.get_lyrics = lyrics
+        self.lyric_searcher = LyricsSearcher()
 
     def process_file(self, args):
         root, file = args
@@ -441,6 +460,20 @@ class MPORG:
 
         save_metadata(metadata)
 
+        # Save Lyrics if any found
+        if self.get_lyrics:
+            t, lyrics = self.lyric_searcher.get_spotify_lyrics(results.track_url, track_info=results)
+            if not t:
+                lyrics = self.lyric_searcher.get_genius_lyrics(results)
+                t = 'txt'
+
+            if not lyrics:
+                return None
+
+            root, file = location.parent, location.stem
+            logging.critical(f"Writing Lyrics for {file}")
+            write_to_file(t, root, file, lyrics)
+
     @wait_if_locked(5)
     def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
 
@@ -462,6 +495,18 @@ class MPORG:
             pass
 
         save_metadata(metadata)
+
+        # Get Lyrics if availiable
+        if self.get_lyrics:
+            lyrics = self.lyric_searcher.get_genius_lyrics(results)
+            t = 'txt'
+
+            if not lyrics:
+                return None
+
+            root, file = location.parent, location.stem
+            logging.critical(f"Writing Lyrics for {file}")
+            write_to_file(t, root, file, lyrics)
 
 
 def _remove_invalid_path_chars(s: str) -> str:
