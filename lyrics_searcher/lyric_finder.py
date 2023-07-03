@@ -3,7 +3,7 @@ from pathlib import Path
 
 from lyrics_searcher.lyricsgenius.genius import Genius
 
-from utils import Track
+from lyrics_searcher.utils import Track
 from syrics.api import Spotify
 
 
@@ -14,7 +14,7 @@ def write_to_file(lyric_type: str, root: Path, filename: str, data: str):
         ext = ".txt"
 
     destination = root / (filename + ext)
-    with open(destination, 'w') as f:
+    with open(destination, 'w', encoding="utf-8") as f:
         f.write(data)
         f.flush()
 
@@ -38,8 +38,7 @@ def _convert_to_lrc(data: dict):
 class LyricsSearcher:
     def __init__(self):
         self.genius = Genius("BspF_-f6EyT3-mzTkDjpPbpH1cRbS3Pdvu4uUs2_Zuh2Ye0wq3dcyXyVtnuumeSP")
-        self.sp = Spotify("AQB51LRlRK_JnD5Pq1tDBqOjqeOU0unPCR-x5RHEXT5C2Tl__YuQEvoM_cMmHQbC3UNzamh5o00a7"
-                          "oc1baSSp9XrXzAmjP8OyF0qikc-lJYpyT2KWIYqfckALAWEr_JkN-SHyuYReX7T7qX5iYh88VnIvIxv-9A2")
+        self.sp = Spotify("AQA90dq4RcwStGKgaE9e3KyYETHO4d9A0PG3izV_oYbUBlD9AQlzh95Vp7862_5Gkmt1K96ucbRA4rK0qBspj7eEpOBdyUx8TTbXZzikGp_XOlOXjDbAUWs9bqwxH4O5cJljvAteLvn2ZiJigqSbZX6KC4v9Uxqp")
 
         self.genius.verbose = False
         self.genius.skip_non_songs = True
@@ -47,7 +46,7 @@ class LyricsSearcher:
         self.genius.sleep_time = 2
         self.genius.retries = 7
 
-    def get_spotify_lyrics(self, t_url=None, t_id=None, track_info=None):
+    def get_spotify_lyrics(self, t_url=None, t_id=None, track_info=None, lrc: bool = False):
 
         if not any((t_url, t_id)):
             return None, None
@@ -61,9 +60,9 @@ class LyricsSearcher:
 
         if not lyrics:
             return None, None
-        elif lyrics.get('syncType') == 'LINE_SYNCED':
+        elif lyrics.get('syncType') == 'LINE_SYNCED' and lrc:
             return 'lrc', self.create_spotify_lrc(track_info, lyrics)
-        elif lyrics.get('syncType') == 'UNSYNCED':
+        elif lyrics.get('syncType') == 'UNSYNCED' or lyrics.get('syncType') == 'LINE_SYNCED' and not lrc:
             return 'txt', self.create_spotify_txt(lyrics)
         else:
             return None, None
@@ -96,7 +95,7 @@ class LyricsSearcher:
         song = self.genius.search_song(track.track_name, track.track_artists[0])
         if not song:
             return None
-        print(song.artist)
+        # print(song.artist)
         title_match = SequenceMatcher(None, song.title.lower(), track.track_name.lower()).quick_ratio()
         if title_match > 0.75:
             return song.lyrics
@@ -111,31 +110,6 @@ class LyricsSearcher:
         t_id = url.replace('https://open.spotify.com/track/', '').replace('/', '')
         lyrics = _convert_to_lrc(self.sp.get_lyrics(t_id))
         return lyrics
-
-
-def test():
-    sp = Spotify(
-        "AQB51LRlRK_JnD5Pq1tDBqOjqeOU0unPCR-x5RHEXT5C2Tl__YuQEvoM_cMmHQbC3UNzamh5o00a7oc1baSSp9XrXzAmjP8OyF0qikc-lJYpyT2KWIYqfckALAWEr_JkN-SHyuYReX7T7qX5iYh88VnIvIxv-9A2")
-
-    lyrics = sp.get_lyrics("0TYMrEy482BCnbvDxiSW1T")
-    print(type(lyrics))
-
-    # print(lyrics)
-    for line in lyrics.get('lyrics', {}).get('lines', []):
-        minutes = int(int(line.get('startTimeMs')) / (1000 * 60))
-        seconds = int((int(line.get('startTimeMs')) / 1000) % 60)
-        centiseconds = int((int(line.get('startTimeMs')) % 1000) / 10)
-        line["TimeStamp"] = f"{minutes}:{seconds}:{centiseconds}"
-        line.pop('startTimeMs')
-        line.pop('syllables')
-        line.pop('endTimeMs')
-
-    print(lyrics)
-    lyrics_searcher = LyricsSearcher()
-    sunfish = Track(track_name='Mr. Sunfish', track_artists=['YonKaGor'], album_name='Mr. Sunfish')
-    lyric_type, lyrics = lyrics_searcher.get_spotify_lyrics(
-        t_url="https://open.spotify.com/track/0YjFF1QQ3L3dNMkXHjEXFy?si=84feb6de68544751", track_info=sunfish)
-    print(lyrics)
 
 
 if __name__ == "__main__":

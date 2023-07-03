@@ -1,12 +1,12 @@
+import logging
 import threading
 from pathlib import Path
 
-from utils import Tagger
-from utils import Track
-from lyric_finder import LyricsSearcher
+from lyrics_searcher.utils import Tagger
+from lyrics_searcher.utils import Track
+from lyrics_searcher.lyric_finder import LyricsSearcher
 
 lyrics_searcher = LyricsSearcher()
-locks = {}
 
 
 def search_lyrics_by_name_artist(track_name, track_artist):
@@ -14,24 +14,21 @@ def search_lyrics_by_name_artist(track_name, track_artist):
     return lyrics_searcher.get_genius_lyrics(track)
 
 
-def search_lyrics_by_spotify_url(spotify_url, track_info=None):
-    return lyrics_searcher.get_spotify_lyrics(t_url=spotify_url, track_info=track_info)
+def search_lyrics_by_spotify_url(spotify_url, track_info=None, lrc=False):
+    return lyrics_searcher.get_spotify_lyrics(t_url=spotify_url, track_info=track_info, lrc=lrc)
 
 
-def search_lyrics_by_spotify_track_id(track_id, track_info=None):
-    return lyrics_searcher.get_spotify_lyrics(t_id=track_id, track_info=track_info)
+def search_lyrics_by_spotify_track_id(track_id, track_info=None, lrc=False):
+    return lyrics_searcher.get_spotify_lyrics(t_id=track_id, track_info=track_info, lrc=lrc)
 
 
-def search_lyrics_by_file(music_file: Path):
-    filename = music_file.stem
-    lyric_file = music_file.parent
-
+def search_lyrics_by_file(music_file: Path, lrc=False):
     # Extract track metadata from the music file and search for lyrics
     track = extract_info_from_file(music_file)
 
     if not track:
-        print(f"Failed to extract track metadata from: {music_file}")
-        return
+        logging.warning(f"Failed to extract track metadata from: {music_file}")
+        return None, None
 
     if not track.track_url or 'https://open.spotify.com/track/' not in track.track_url:
         source_type = 'genius'
@@ -41,7 +38,7 @@ def search_lyrics_by_file(music_file: Path):
     result = None
     lyric_type = None
     if source_type == 'spotify':
-        lyric_type, result = search_lyrics_by_spotify_url(track.track_url, track)
+        lyric_type, result = search_lyrics_by_spotify_url(track.track_url, track, lrc)
         if not lyric_type:
             source_type = 'genius'
 
@@ -51,35 +48,13 @@ def search_lyrics_by_file(music_file: Path):
             lyric_type = 'txt'
 
     if result:
-        destination = lyric_file / (filename + '.' + lyric_type)
-        print(lyric_type)
-        if not locks.get(str(destination)):
-            locks[str(destination)] = threading.Lock()
-
-        with locks[str(destination)]:
-            if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
-                txt = lyric_file / (filename + ".txt")
-                lrc = lyric_file / (filename + ".lrc")
-                if txt.exists():
-                    print(f"Deleting {txt}")
-                    txt.unlink()
-
-                else:
-                    print(f"Deleting {lrc}")
-                    lrc.unlink()
-
-            with open(destination, 'w') as f:
-                f.write(result)
-
-        print(f"Lyric file created for: {music_file}")
-    else:
-        print(f"No lyrics found for: {music_file}")
+        return lyric_type, result
+    return None, None
 
 
 def extract_info_from_file(file):
     metadata = Tagger(file)
 
-    #print(metadata.tagger.get('comment'))
     comment = metadata.get('comment', [])
     artist = metadata.get('artist', [])
     title = metadata.get('title', [])

@@ -22,6 +22,7 @@ from mutagen.easymp4 import EasyMP4
 from mutagen.wave import WAVE
 from mutagen.asf import ASF
 
+from lyrics_searcher.api import search_lyrics_by_file
 from lyrics_searcher.lyric_finder import LyricsSearcher, write_to_file
 from mporg.spotify_searcher import SpotifySearcher, Track
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
@@ -54,7 +55,7 @@ def wait_if_locked(timeout):
     def decorator(func):
         def wrapper(*args, **kwargs):
 
-            locks = tuple(arg for arg in args if isinstance(arg, type(Lock())))
+            locks = set(arg for arg in args if isinstance(arg, type(Lock())))
 
             func_args = tuple(arg for arg in args if arg not in locks)
 
@@ -191,6 +192,8 @@ def save_metadata(tagger: Tagger):
             logging.exception(f"Unhandled MutagenError {e}")
 
 
+
+
 class MPORG:
 
     def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]
@@ -215,9 +218,8 @@ class MPORG:
             except mutagen.MutagenError:
                 metadata = {}
 
-            ext = file.suffix
             results, tags_from = self.get_metadata(metadata, path)
-            location = self.get_location(results, tags_from, metadata, ext, file)
+            location = self.get_location(results, tags_from, metadata, file)
 
             source_lock = self.get_lock(path)
             destination_lock = self.get_lock(location)
@@ -228,6 +230,9 @@ class MPORG:
                 self.update_metadata_from_spotify(lock, location, results)
             elif tags_from == TagType.FINGERPRINTER:
                 self.update_metadata_from_fingerprinter(lock, location, results)
+
+            if self.get_lyrics:
+                self.save_lyrics(location)
 
             return None
         except ValueError as e:
@@ -267,7 +272,8 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        artist = [str(u).replace('\x00', '') for u in metadata.get('artist', '')]  # Replace Null Bytes
+        artist = ["".join(str(u).replace('\x00', '').split('/')) for u in
+                  metadata.get('artist', '')]  # Replace Null Bytes
         title = [str(u).replace('\x00', '') for u in metadata.get('title', '')]
         if len(artist) == 1:
             artist = "".join(artist)
@@ -322,7 +328,7 @@ class MPORG:
             return results
         return None
 
-    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, ext: str, file: Path) -> Path:
+    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, file: Path) -> Path:
         """
         Determine the correct location to move the file based on metadata results and source
         :param file: Filename of original file
@@ -332,6 +338,7 @@ class MPORG:
         :param ext: # Extension of original file
         :return: The path of the destination file
         """
+        ext = file.suffix
         if tags_from == TagType.SPOTIFY:
             return self.spotify_location(results, ext)
         elif tags_from == TagType.FINGERPRINTER:
@@ -432,7 +439,7 @@ class MPORG:
 
         return self.file_locks[path]
 
-    @wait_if_locked(5)
+    @wait_if_locked(10)
     def update_metadata_from_spotify(self, location: Path, results: Track) -> None:
         """
         Update file metadata with Spotify results
@@ -460,21 +467,7 @@ class MPORG:
 
         save_metadata(metadata)
 
-        # Save Lyrics if any found
-        if self.get_lyrics:
-            t, lyrics = self.lyric_searcher.get_spotify_lyrics(results.track_url, track_info=results)
-            if not t:
-                lyrics = self.lyric_searcher.get_genius_lyrics(results)
-                t = 'txt'
-
-            if not lyrics:
-                return None
-
-            root, file = location.parent, location.stem
-            logging.critical(f"Writing Lyrics for {file}")
-            write_to_file(t, root, file, lyrics)
-
-    @wait_if_locked(5)
+    @wait_if_locked(10)
     def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
 
         metadata = Tagger(location)
@@ -496,17 +489,40 @@ class MPORG:
 
         save_metadata(metadata)
 
+    def save_lyrics(self, location: Path):
         # Get Lyrics if availiable
-        if self.get_lyrics:
-            lyrics = self.lyric_searcher.get_genius_lyrics(results)
-            t = 'txt'
+        lock = self.get_lock(location)
+        with lock:
+            t, lyrics = search_lyrics_by_file(location, lrc=True)
 
-            if not lyrics:
-                return None
+        if not lyrics:
+            return None
 
-            root, file = location.parent, location.stem
-            logging.critical(f"Writing Lyrics for {file}")
-            write_to_file(t, root, file, lyrics)
+        lyric_file = location.parent
+        filename = location.stem
+        destination = lyric_file / (filename + '.' + t)
+
+        lock = self.get_lock(destination)
+
+        with lock:
+            if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
+                txt = lyric_file / (filename + ".txt")
+                lrc = lyric_file / (filename + ".lrc")
+                extisting = (txt, lrc)
+
+                for file in extisting:
+                    if file.exists():
+                        with open(file) as f:
+                            if not lyrics == f.read():
+                                logging.info(f"Deleting {file}")
+                                file.unlink()
+                            else:
+                                logging.info(f"{file} is current")
+                                return
+
+            logging.critical(destination)
+            with open(destination, 'w', encoding="utf-8") as f:
+                f.write(lyrics)
 
 
 def _remove_invalid_path_chars(s: str) -> str:

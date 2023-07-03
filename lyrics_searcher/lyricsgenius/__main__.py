@@ -39,7 +39,7 @@ def main(args=None):
 
     # Handle the command-line inputs
     if args.search_type == "song":
-        song = api.search_song(*args.terms)
+        song = api
         if not song:
             if not args.quiet:
                 print("Could not find specified song. Check spelling?")
@@ -57,7 +57,7 @@ def main(args=None):
                 print("Saving '{a}'' lyrics...".format(a=safe_unicode(artist.name)))
             api.save_artists(artist)
     elif args.search_type == "album":
-        album = api.search_album(*args.terms)
+        album = api
         if args.save:
             if not args.quiet:
                 print("Saving '{a}'' lyrics...".format(a=safe_unicode(album.name)))
