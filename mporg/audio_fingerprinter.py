@@ -99,8 +99,8 @@ class ACRFingerprinter(Fingerprinter):
             out.results = Track(
                 track_name=track,
                 track_year=date,
-                track_artists=artists,
-                album_artists=artists,
+                track_artists=tuple(artists),
+                album_artists=tuple(artists),
                 album_genres=genres,
                 album_name=album
             )
@@ -125,10 +125,10 @@ class MBFingerprinter(Fingerprinter):
 
     def fingerprint(self, path_to_fingerprint: Path) -> 'FingerprintResult':
         cache_key = str(path_to_fingerprint)
-        cached_result = self.cache.get(cache_key)
-        if cached_result is not None:
-            logging.info(f"Using cached result for {path_to_fingerprint}")
-            return cached_result
+        #cached_result = self.cache.get(cache_key)
+        #if cached_result is not None:
+        #    logging.info(f"Using cached result for {path_to_fingerprint}")
+        #    return cached_result
         try:
             logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
@@ -228,8 +228,8 @@ class MBFingerprinter(Fingerprinter):
         out.results = Track(
             track_name=track,
             track_year=date,
-            track_artists=artists,
-            album_artists=album_artists,
+            track_artists=tuple(artists),
+            album_artists=tuple(album_artists),
             album_genres=album_genres,
             album_name=album,
             track_id=release_id,
