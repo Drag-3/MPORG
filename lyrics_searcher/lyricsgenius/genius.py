@@ -134,7 +134,7 @@ class Genius(API, PublicAPI):
         )
 
         # Determine the class of the div
-        div = html.find('div', {'data-lyrics-container': True})
+        div = html.findAll('div', {'data-lyrics-container': True}) # In Genius Lyrics split up between divs
         if div is None:
             if self.verbose:
                 print("Couldn't find the lyrics section. "
@@ -142,7 +142,9 @@ class Genius(API, PublicAPI):
                       "Song URL: https://genius.com/{}".format(path))
             return None
 
-        lyrics = div.get_text()
+        lyrics = ''
+        for data in div:
+            lyrics += data.get_text()
 
         # Remove [Verse], [Bridge], etc.
         if self.remove_section_headers or remove_section_headers:

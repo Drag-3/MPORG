@@ -508,9 +508,9 @@ class MPORG:
             if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
                 txt = lyric_file / (filename + ".txt")
                 lrc = lyric_file / (filename + ".lrc")
-                extisting = (txt, lrc)
+                existing = (txt, lrc)
 
-                for file in extisting:
+                for file in existing:
                     if file.exists():
                         with open(file) as f:
                             if not lyrics == f.read():
