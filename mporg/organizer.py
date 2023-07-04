@@ -2,30 +2,29 @@ import enum
 import logging
 import os
 import random
+import shutil
 import sys
 import threading
-from contextlib import ExitStack, contextmanager
-from math import ceil
-from threading import Lock
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
+from contextlib import ExitStack, contextmanager
+from math import ceil
 from pathlib import Path
-import shutil
-
-from mutagen.flac import FLAC
-from mutagen.id3 import ID3NoHeaderError
-from tqdm import tqdm
+from threading import Lock
 
 import mutagen
+from mutagen.asf import ASF
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4
+from mutagen.flac import FLAC
+from mutagen.id3 import ID3NoHeaderError
 from mutagen.wave import WAVE
-from mutagen.asf import ASF
+from tqdm import tqdm
 
 from lyrics_searcher.api import search_lyrics_by_file
-from lyrics_searcher.lyric_finder import LyricsSearcher, write_to_file
-from mporg.spotify_searcher import SpotifySearcher, Track
+from lyrics_searcher.lyric_finder import LyricsSearcher
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
+from mporg.spotify_searcher import SpotifySearcher, Track
 
 INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
 SUPPORTED_FILETYPES = [".mp3", ".wav", ".flac", ".ogg", ".wma", ".m4a", ".oga"]
@@ -75,11 +74,11 @@ def wait_if_locked(timeout):
 
 
 def register_comment(lang='\0\0\0', desc=''):
-    "Register the comment tag"
-    frameid = ':'.join(('COMM', desc, lang))
+    """Register the comment tag"""
+    frame_id = ':'.join(('COMM', desc, lang))
 
     def getter(id3, _key):
-        frame = id3.get(frameid)
+        frame = id3.get(frame_id)
         return None if frame is None else list(frame)
 
     def setter(id3, _key, value):
@@ -87,7 +86,7 @@ def register_comment(lang='\0\0\0', desc=''):
             encoding=3, lang=lang, desc=desc, text=value))
 
     def deleter(id3, _key):
-        del id3[frameid]
+        del id3[frame_id]
 
     EasyID3.RegisterKey('comment', getter, setter, deleter)
 
@@ -192,12 +191,10 @@ def save_metadata(tagger: Tagger):
             logging.exception(f"Unhandled MutagenError {e}")
 
 
-
-
 class MPORG:
 
-    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter]
-                 , pattern: list, lyrics: bool):
+    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter],
+                 pattern: list, lyrics: bool):
         self.search = search
         self.store = store
         self.sh = searcher
@@ -331,11 +328,10 @@ class MPORG:
     def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, file: Path) -> Path:
         """
         Determine the correct location to move the file based on metadata results and source
-        :param file: Filename of original file
+        :param Path file: Path for original file
         :param results: Track Object containing Metadata
         :param tags_from: Source of Tags
         :param metadata: # Tagger object containing origin file tags
-        :param ext: # Extension of original file
         :return: The path of the destination file
         """
         ext = file.suffix
@@ -490,7 +486,7 @@ class MPORG:
         save_metadata(metadata)
 
     def save_lyrics(self, location: Path):
-        # Get Lyrics if availiable
+        # Get Lyrics if available
         lock = self.get_lock(location)
         with lock:
             t, lyrics = search_lyrics_by_file(location, lrc=True)
