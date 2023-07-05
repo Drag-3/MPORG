@@ -29,7 +29,7 @@ class CredentialProvider:
     def _load_from_file(self):
         data = {}
         try:
-            with open(self.credential_file, 'r+') as cred:
+            with open(self.credential_file, 'r+', encoding="utf-8") as cred:
 
                 try:
                     data = json.load(cred)
@@ -43,7 +43,7 @@ class CredentialProvider:
         raise NotImplementedError("Subclasses must implement get_credentials()")
 
     def store_credentials(self, credentials):
-        with open(self.credential_file, 'w') as file:
+        with open(self.credential_file, 'w', encoding="utf-8") as file:
             json.dump(credentials, file)
 
 

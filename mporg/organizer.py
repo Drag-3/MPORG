@@ -22,7 +22,6 @@ from mutagen.wave import WAVE
 from tqdm import tqdm
 
 from lyrics_searcher.api import search_lyrics_by_file
-from lyrics_searcher.lyric_finder import LyricsSearcher
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 from mporg.spotify_searcher import SpotifySearcher, Track
 
@@ -203,7 +202,6 @@ class MPORG:
         self.executor = ThreadPoolExecutor()
         self.pattern = pattern
         self.get_lyrics = lyrics
-        self.lyric_searcher = LyricsSearcher()
 
     def process_file(self, args):
         root, file = args
