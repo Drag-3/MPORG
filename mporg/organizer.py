@@ -291,9 +291,9 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        artist = ["".join(str(u).replace('\x00', '').split('/')) for u in
+        artist = ["".join(u.replace('\x00', '').split('/')) for u in
                   metadata.get('artist', '')]  # Replace Null Bytes
-        title = [str(u).replace('\x00', '') for u in metadata.get('title', '')]
+        title = [u.replace('\x00', '') for u in metadata.get('title', '')]
         if len(artist) == 1:
             artist = "".join(artist)
         if len(title) == 1:
