@@ -5,6 +5,7 @@ mutagen~=1.46.0
 pyacoustid~=1.2.2
 spotipy~=2.23.0
 requests==2.31.0
+git+https://github.com/Drag-3/LyricsSearcher.git
 # Linux requirements
 pyacrcloud~=1.0.1; sys_platform == 'linux'
 

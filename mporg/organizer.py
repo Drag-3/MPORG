@@ -183,6 +183,8 @@ def save_metadata(tagger: Tagger):
             break
         except mutagen.MutagenError:
             time.sleep(random.randint(1, 3))
+        except Exception as e:
+            logging.exception(f"EXP - Saving Metadata: {e} -> {tagger.tagger}")
     else:
         try:
             tagger.save()
@@ -212,6 +214,9 @@ class MPORG:
                 metadata = Tagger(path)
             except mutagen.MutagenError:
                 metadata = {}
+            except Exception as e:
+                logging.exception(f"EXP - Loading Metadata: {e} {path}")
+                raise e
 
             results, tags_from = self.get_metadata(metadata, path)
             location = self.get_location(results, tags_from, metadata, file)
@@ -442,7 +447,11 @@ class MPORG:
         :return:
         """
 
-        metadata = Tagger(location)
+        try:
+            metadata = Tagger(location)
+        except Exception as e:
+            logging.exception(f"Error getting metadata for update {e} ")
+            raise e
         metadata['title'] = results.track_name
         metadata['artist'] = ";".join(results.track_artists)
         metadata['album'] = results.album_name
@@ -451,7 +460,7 @@ class MPORG:
         metadata['discnumber'] = str(results.track_disk)
         metadata['comment'] = results.track_url
         metadata['source'] = results.track_url
-        metadata['albumartist'] = results.album_artists
+        metadata['albumartist'] = ";".join(results.album_artists)
         metadata['bpm'] = str(int(results.track_bpm))
         try:
             metadata['initialkey'] = results.track_key
@@ -464,10 +473,14 @@ class MPORG:
     @wait_if_locked(10)
     def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
 
-        metadata = Tagger(location)
+        try:
+            metadata = Tagger(location)
+        except Exception as e:
+            logging.exception(f"Error getting metadata for update {e} ")
+            raise e
         metadata['title'] = results.track_name
         metadata['artist'] = ";".join(results.track_artists)
-        metadata['albumartist'] = results.album_artists
+        metadata['albumartist'] = ";".join(results.album_artists)
         try:
             metadata['album'] = results.album_name
         except ValueError:
