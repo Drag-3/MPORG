@@ -64,10 +64,10 @@ class SpotifySearcher:
 
     def search(self, name: str = None, artist: str = None, spot_id: str = None) -> None | Track:
         cache_key = f"{name}-{artist}-{spot_id}"
-        #if cache_key in self.cache:
+        if cache_key in self.cache:
             # If the response is already in the cache, return it
-            #logging.info("Returning cached spotify response")
-            #return self.cache[cache_key]
+            logging.info("Returning cached spotify response")
+            return self.cache[cache_key]
         if not name and not spot_id:
             logging.warning("No name or ID provided.")
             return None

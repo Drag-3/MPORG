@@ -518,37 +518,71 @@ class MPORG:
     def save_lyrics(self, location: Path):
         # Get Lyrics if available
         lock = self.get_lock(location)
-        with lock:
-            t, lyrics = search_lyrics_by_file(location, lrc=True)
 
-        if not lyrics:
-            return None
+        retry_limit = 5
+        retry_delay = 2  # seconds
 
-        lyric_file = location.parent
-        filename = location.stem
-        destination = lyric_file / (filename + '.' + t)
+        for _ in range(retry_limit):
+            try:
+                logging.info(f"Searching for lyrics for {location}")
+                t, lyrics = search_lyrics_by_file(location, lrc=True)
 
-        lock = self.get_lock(destination)
+                if not lyrics:
+                    return None
+                logging.info(f"Lyrics found for {location}. Type {t}.")
+                lyric_file = location.parent
+                filename = location.stem
+                destination = lyric_file / (filename + '.' + t)
 
-        with lock:
-            if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
-                txt = lyric_file / (filename + ".txt")
-                lrc = lyric_file / (filename + ".lrc")
-                existing = (txt, lrc)
+                destination_lock = self.get_lock(destination)
 
-                for file in existing:
-                    if file.exists():
-                        with open(file) as f:
-                            if not lyrics == f.read():
-                                logging.info(f"Deleting {file}")
-                                file.unlink()
-                            else:
-                                logging.info(f"{file} is current")
-                                return
+                for _ in range(retry_limit):
 
-            logging.critical(destination)
-            with open(destination, 'w', encoding="utf-8") as f:
-                f.write(lyrics)
+                    if (lyric_file / (filename + ".txt")).exists() or (
+                            lyric_file / (filename + ".lrc")).exists():
+                        txt = lyric_file / (filename + ".txt")
+                        lrc = lyric_file / (filename + ".lrc")
+                        existing = (txt, lrc)
+
+                        for file in existing:
+                            if file.exists():
+                                logging.info(f"A lyrics file already exists for {location}, check if current.")
+
+                                with open(file, 'r', encoding='utf-8') as f:
+                                    if not lyrics == f.read():
+                                        logging.info(f"Deleting {file}")
+                                        try:
+                                            file.unlink()
+                                        except TimeoutError as e:
+                                            logging.exception(e)
+                                            logging.error("Error Unlinking file. Try to Ignore")
+                                    else:
+                                        logging.info(f"{file} is current")
+                                        return
+
+                    try:
+                        logging.critical(destination)
+                        with acquire(destination_lock, timeout=30):
+                            with open(destination, 'w', encoding="utf-8") as f:
+                                f.write(lyrics)
+
+                        return  # File operations completed successfully, exit the function
+
+                    except TimeoutError:
+                        # Lock acquisition timed out
+                        time.sleep(retry_delay)
+                        continue
+
+                # Retry limit reached for destination lock, file operations failed
+                logging.error(f"Failed to acquire destination lock for {destination}")
+
+            except TimeoutError:
+                # Lock acquisition timed out
+                time.sleep(retry_delay)
+                continue
+
+        # Retry limit reached for location lock, file operations failed
+        logging.error(f"Failed to acquire location lock for {location}")
 
 
 def _remove_invalid_path_chars(s: str) -> str:
