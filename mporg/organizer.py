@@ -13,7 +13,7 @@ from pathlib import Path
 from threading import Lock
 
 import mutagen
-from mutagen.asf import ASF
+from mutagen.asf import ASF, ASFUnicodeAttribute
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4
 from mutagen.flac import FLAC
@@ -105,33 +105,52 @@ class Tagger:
         EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
 
         # Determine mutagen object to use
-        extension = file.suffix
-        if extension.lower() == ".mp3":
+        self.extension = file.suffix
+        if self.extension.lower() == ".mp3":
             try:
                 self.tagger = EasyID3(file)
             except ID3NoHeaderError:
                 self.tagger = mutagen.File(file, easy=True)
                 self.tagger.add_tags()
 
-        elif extension.lower() == ".m4a":
+        elif self.extension.lower() == ".m4a":
             self.tagger = EasyMP4(file)
-        elif extension.lower() == ".wav":
+        elif self.extension.lower() == ".wav":
             self.tagger = WAVE(file)
-        elif extension.lower() in [".wma"]:
+        elif self.extension.lower() in [".wma"]:
             self.tagger = ASF(file)
-        elif extension.lower() == ".flac":
+        elif self.extension.lower() == ".flac":
             self.tagger = FLAC(file)
-        elif extension.lower() in [".ogg", ".oga"]:
+        elif self.extension.lower() in [".ogg", ".oga"]:
             self.tagger = mutagen.File(file)  # Cannot tell if Opus Vorbis or other based on extension alone.
         else:
-            logging.warning(f"{file} has invalid extension {extension}")
+            logging.warning(f"{file} has invalid extension {self.extension}")
             raise ValueError("Invalid Extension")
 
     def get(self, key, value=None):
-        return self.tagger.get(key, value)
+        result = self.tagger.get(key, value)
+        if self.extension.lower() == ".wma":
+            if isinstance(result, list):
+                # Convert each item in the list to string as ASF/WMA uses special Values
+                result = [str(item) for item in result]
+            elif isinstance(result, ASFUnicodeAttribute):
+                # If it's an ASFUnicodeAttribute, extract the string value
+                result = str(result)
+
+        return result
 
     def __getitem__(self, item):
-        return self.tagger.__getitem__(item)
+
+        result = self.tagger.__getitem__(item)
+        if self.extension.lower() == ".wma":
+            if isinstance(result, list):
+                # Convert each item in the list to string as ASF/WMA uses special Values
+                result = [str(item) for item in result]
+            elif isinstance(result, ASFUnicodeAttribute):
+                # If it's an ASFUnicodeAttribute, extract the string value
+                result = str(result)
+
+        return result
 
     def __setitem__(self, key, value):
         self.tagger.__setitem__(key, value)
@@ -499,37 +518,71 @@ class MPORG:
     def save_lyrics(self, location: Path):
         # Get Lyrics if available
         lock = self.get_lock(location)
-        with lock:
-            t, lyrics = search_lyrics_by_file(location, lrc=True)
 
-        if not lyrics:
-            return None
+        retry_limit = 5
+        retry_delay = 2  # seconds
 
-        lyric_file = location.parent
-        filename = location.stem
-        destination = lyric_file / (filename + '.' + t)
+        for _ in range(retry_limit):
+            try:
+                logging.info(f"Searching for lyrics for {location}")
+                t, lyrics = search_lyrics_by_file(location, lrc=True)
 
-        lock = self.get_lock(destination)
+                if not lyrics:
+                    return None
+                logging.info(f"Lyrics found for {location}. Type {t}.")
+                lyric_file = location.parent
+                filename = location.stem
+                destination = lyric_file / (filename + '.' + t)
 
-        with lock:
-            if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
-                txt = lyric_file / (filename + ".txt")
-                lrc = lyric_file / (filename + ".lrc")
-                existing = (txt, lrc)
+                destination_lock = self.get_lock(destination)
 
-                for file in existing:
-                    if file.exists():
-                        with open(file) as f:
-                            if not lyrics == f.read():
-                                logging.info(f"Deleting {file}")
-                                file.unlink()
-                            else:
-                                logging.info(f"{file} is current")
-                                return
+                for _ in range(retry_limit):
 
-            logging.critical(destination)
-            with open(destination, 'w', encoding="utf-8") as f:
-                f.write(lyrics)
+                    if (lyric_file / (filename + ".txt")).exists() or (
+                            lyric_file / (filename + ".lrc")).exists():
+                        txt = lyric_file / (filename + ".txt")
+                        lrc = lyric_file / (filename + ".lrc")
+                        existing = (txt, lrc)
+
+                        for file in existing:
+                            if file.exists():
+                                logging.info(f"A lyrics file already exists for {location}, check if current.")
+
+                                with open(file, 'r', encoding='utf-8') as f:
+                                    if not lyrics == f.read():
+                                        logging.info(f"Deleting {file}")
+                                        try:
+                                            file.unlink()
+                                        except TimeoutError as e:
+                                            logging.exception(e)
+                                            logging.error("Error Unlinking file. Try to Ignore")
+                                    else:
+                                        logging.info(f"{file} is current")
+                                        return
+
+                    try:
+                        logging.critical(destination)
+                        with acquire(destination_lock, timeout=30):
+                            with open(destination, 'w', encoding="utf-8") as f:
+                                f.write(lyrics)
+
+                        return  # File operations completed successfully, exit the function
+
+                    except TimeoutError:
+                        # Lock acquisition timed out
+                        time.sleep(retry_delay)
+                        continue
+
+                # Retry limit reached for destination lock, file operations failed
+                logging.error(f"Failed to acquire destination lock for {destination}")
+
+            except TimeoutError:
+                # Lock acquisition timed out
+                time.sleep(retry_delay)
+                continue
+
+        # Retry limit reached for location lock, file operations failed
+        logging.error(f"Failed to acquire location lock for {location}")
 
 
 def _remove_invalid_path_chars(s: str) -> str:
