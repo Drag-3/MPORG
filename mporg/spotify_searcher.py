@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from urllib.error import HTTPError
 
 import diskcache
@@ -32,6 +32,14 @@ logging.getLogger('__main.' + __name__)
 logging.propagate = True
 
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError("Type %s not serializable" % type(obj))
+
+
 @dataclass(frozen=True)
 class Track:
     track_name: str = None
@@ -57,34 +65,51 @@ from urllib3.util.retry import Retry
 import threading
 
 locks = {}
+
+
 class SpotifySearcher:
     def __init__(self, cid: str, secret: str):
+        self.cid = cid
+        self.secret = secret
+
+        self.auth_path = CONFIG_DIR / ".sp_auth_cache"
+
+        self.auth_lock = threading.Lock()
+        self.auth_path_lock = threading.Lock()
+
+        self.session = requests.Session()
+        retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[429, 500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
+
+        self.token_info = self.load_auth()
+        if self.token_info:
+            self.session.headers.update(
+                {'Authorization': f'{self.token_info["token_type"]} {self.token_info["access_token"]}'})
+
+        self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "spotifycache"))
+        self.cache.expire(60 * 60 * 12)  # Set the cache to expire in 12 hours
+        self.semaphores = {
+            'search': threading.Semaphore(3),
+            'tracks': threading.Semaphore(3),
+            'audio-analysis': threading.Semaphore(2),
+            'artists': threading.Semaphore(1)
+        }
+
+    def load_auth(self):
         try:
-            self.auth_path = CONFIG_DIR / ".sp_auth_cache"
-            self.auth_lock = threading.Lock()
-            self.session = requests.Session()
-            retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[429, 500, 502, 503, 504])
-            adapter = HTTPAdapter(max_retries=retries)
-            self.session.mount('https://', adapter)
-            self.session.mount('http://', adapter)
-
-            resp = self.authenticate(cid, secret)
-
-            self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "spotifycache"))
-            self.cache.expire(60 * 60 * 12)  # Set the cache to expire in 12 hours
-            self.semaphores = {
-                'search': threading.Semaphore(3),
-                'track': threading.Semaphore(3),
-                'audio-analysis': threading.Semaphore(2),
-                'artists': threading.Semaphore(1)
-            }
-        except Exception as e:
-            logging.exception(e)
-            raise e
+            with self.auth_path_lock, open(self.auth_path, 'r', encoding='utf-8') as f:
+                info = json.load(f)
+                info['expires'] = datetime.fromisoformat(info['expires'])
+                return info
+        except FileNotFoundError:
+            return None
 
     def save_auth(self, data):
-        with self.auth_lock, open(self.auth_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f)
+        with self.auth_path_lock, open(self.auth_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, default=json_serial)
+
     def authenticate(self, cid, secret):
         AUTH_URL = "https://accounts.spotify.com/api/token"
         auth_resp = requests.post(AUTH_URL, {"grant_type": "client_credentials",
@@ -100,6 +125,25 @@ class SpotifySearcher:
 
         return {'token_type': token_type, 'access_token': access_token, 'expires': expiration_date_time}
 
+    def update_token(self):
+        logging.info("Updating Token")
+        new_token_info = self.authenticate(self.cid, self.secret)
+        self.session.headers.update(
+            {'Authorization': f'{new_token_info["token_type"]} {new_token_info["access_token"]}'})
+        self.token_info = new_token_info
+        self.save_auth(new_token_info)
+
+    def token_expired(self):
+        remaining = self.token_info.get('expires') - datetime.now()
+        secs = remaining.total_seconds()
+        return secs < 45
+
+    def validate_token(self):
+        if self.token_info is None or self.token_expired():
+            with self.auth_lock:
+                if self.token_info is None or self.token_expired():
+                    self.update_token()
+
     def search(self, name: str = None, artist: str = None, spot_id: str = None) -> None | Track:
         cache_key = f"{name}-{artist}-{spot_id}"
         if cache_key in self.cache:
@@ -112,7 +156,7 @@ class SpotifySearcher:
 
         if spot_id:
             logging.debug("Searching with Spotify ID")
-            result = self._get_item('track', id=spot_id)
+            result = self._get_item_base('tracks', spot_id)
             track_info = self._get_track_info(result)
             self.cache[cache_key] = track_info  # Cache the response
             return track_info
@@ -135,6 +179,7 @@ class SpotifySearcher:
         return None
 
     def _get_item(self, endpoint: str, **params):
+        self.validate_token()
         with self.semaphores[endpoint]:
             response = self.session.get(f'https://api.spotify.com/v1/{endpoint}', params=params, timeout=20)
             if response.status_code == 429:
@@ -146,6 +191,7 @@ class SpotifySearcher:
             return response.json()
 
     def _get_item_base(self, endpoint: str, value):
+        self.validate_token()
         with self.semaphores[endpoint]:
             response = self.session.get(f"https://api.spotify.com/v1/{endpoint}/{value}", timeout=20)
 
