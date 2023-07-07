@@ -480,7 +480,10 @@ class MPORG:
         metadata['comment'] = results.track_url
         metadata['source'] = results.track_url
         metadata['albumartist'] = ";".join(results.album_artists)
-        metadata['bpm'] = str(int(results.track_bpm))
+        try:
+            metadata['bpm'] = str(int(results.track_bpm))
+        except TypeError:
+            pass
         try:
             metadata['initialkey'] = results.track_key
         except TypeError:
