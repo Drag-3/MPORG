@@ -291,6 +291,13 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
+        comment = metadata.get('comment')
+        source = metadata.get('source')
+        url = metadata.get('url')
+
+        if (spot_id := get_valid_spotify_url((comment, source, url))):
+            spotify_results = self.get_fingerprint_spotify_metadata(spot_id)
+            return spotify_results, TagType.SPOTIFY
         artist = ["".join(u.replace('\x00', '').split('/')) for u in
                   metadata.get('artist', '')]  # Replace Null Bytes
         title = [u.replace('\x00', '') for u in metadata.get('title', '')]
@@ -652,3 +659,16 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
             total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
 
     return album_artist, album_name, track_artist, track_name
+
+
+def get_valid_spotify_url(strings):
+    spotify_track_url = "https://open.spotify.com/track/"
+
+    for string in strings:
+        if string and spotify_track_url in string:
+            track_id = string.replace(spotify_track_url, "")
+            track_id = track_id.split('?')[0]  # Remove any trailing params
+            return track_id
+
+    return None
+
