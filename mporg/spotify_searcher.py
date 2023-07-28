@@ -1,15 +1,16 @@
 import json
 import logging
 import random
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, date
-from urllib.error import HTTPError
 
 import diskcache
-import spotipy
-import spotipy as sy
-from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOauthError
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 from mporg import CONFIG_DIR
 
 PITCH_CODES = {
@@ -59,11 +60,6 @@ class Track:
     album_id: str = None
 
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-import threading
-
 locks = {}
 
 
@@ -94,7 +90,7 @@ class SpotifySearcher:
             'search': threading.Semaphore(3),
             'tracks': threading.Semaphore(3),
             'audio-analysis': threading.Semaphore(2),
-            'artists': threading.Semaphore(1)
+            'artists': threading.Semaphore(2)
         }
 
     def load_auth(self):

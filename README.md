@@ -94,6 +94,8 @@ You can specify the following command line options to customize the behavior of 
 - `-a`, `--acrcloud`: Use Acrcloud for audio fingerprinting.
 - `-m`, `--music_brainz`: Use Musicbrainz for audio fingerprinting.
 - `-f`, `--fingerprint`: Use all fingerprinters (same as `-am`).
+- `-p`, `--pattern_extension`: Extension(s) to copy over, space separated.
+- `-y`, `--lyrics`: Attempt to get lyrics and store with file.
 
 ### Examples
 - To run MPORG with a specific store path and search path:
@@ -105,6 +107,10 @@ You can specify the following command line options to customize the behavior of 
   ```bash
   mporg -l 2 -am
   ```
+  ```bash
+  mporg Music Downloads -fl 1 -p flac oga wma -y
+  ```
+  
 
 ### Additional Help
 To see all available options and their descriptions, run the following command:
@@ -137,4 +143,4 @@ MPORG was created by Drag (Justin Erysthee).
 MPORG is licensed under the GPL-3.0 license.
 
 
-*This README is applicable for version 0.1a2.*
+*This README is applicable for version 0.1a3.*

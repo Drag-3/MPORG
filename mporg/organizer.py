@@ -13,6 +13,7 @@ from pathlib import Path
 from threading import Lock
 
 import mutagen
+from lyrics_searcher.api import search_lyrics_by_file
 from mutagen.asf import ASF, ASFUnicodeAttribute
 from mutagen.easyid3 import EasyID3
 from mutagen.easymp4 import EasyMP4
@@ -21,7 +22,6 @@ from mutagen.id3 import ID3NoHeaderError
 from mutagen.wave import WAVE
 from tqdm import tqdm
 
-from lyrics_searcher.api import search_lyrics_by_file
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 from mporg.spotify_searcher import SpotifySearcher, Track
 
@@ -140,7 +140,6 @@ class Tagger:
         return result
 
     def __getitem__(self, item):
-
         result = self.tagger.__getitem__(item)
         if self.extension.lower() == ".wma":
             if isinstance(result, list):
@@ -175,6 +174,12 @@ def file_generator(search: Path) -> (Path, Path):
 
 
 def get_file_count(path, pbar=None):
+    """
+    Recursively get the count of files in a directory, including files in subdirectories
+    :param Path path: Path to start searching
+    :param tqdm pbar: tqdm pbar to use for displaying progress
+    :return:
+    """
     file_count = 0
     if pbar is None:
         pbar = tqdm(desc="Scanning Search Directory", unit=" file")
@@ -184,7 +189,7 @@ def get_file_count(path, pbar=None):
             file_count += 1
             pbar.update(1)
         elif entry.is_dir():
-            file_count += get_file_count(entry.path, pbar)
+            file_count += get_file_count(Path(entry.path), pbar)
     return file_count
 
 
@@ -195,6 +200,11 @@ def pool_callback(result, pbar):
 
 
 def save_metadata(tagger: Tagger):
+    """
+    Saves the metadata of a Tagger object, attempting to mitigate exceptions
+    :param Tagger tagger: Tagger object to save
+    :return: None
+    """
     retries = 3
     for _ in range(retries):
         try:
@@ -223,6 +233,7 @@ class MPORG:
         self.executor = ThreadPoolExecutor()
         self.pattern = pattern
         self.get_lyrics = lyrics
+        self.lyric_semaphore = threading.Semaphore(5)
 
     def process_file(self, args):
         root, file = args
@@ -251,7 +262,8 @@ class MPORG:
                 self.update_metadata_from_fingerprinter(lock, location, results)
 
             if self.get_lyrics:
-                self.save_lyrics(location)
+                with self.lyric_semaphore:
+                    self.save_lyrics(location)
 
             return None
         except ValueError as e:
@@ -295,7 +307,8 @@ class MPORG:
         source = metadata.get('source')
         url = metadata.get('url')
 
-        if (spot_id := get_valid_spotify_url((comment, source, url))):
+        if spot_id := get_valid_spotify_url((comment, source, url)):
+            logging.info(f"A spotify Url was found in {file} metadata. Searching via id")
             spotify_results = self.get_fingerprint_spotify_metadata(spot_id)
             return spotify_results, TagType.SPOTIFY
         artist = ["".join(u.replace('\x00', '').split('/')) for u in
@@ -468,9 +481,10 @@ class MPORG:
     def update_metadata_from_spotify(self, location: Path, results: Track) -> None:
         """
         Update file metadata with Spotify results
-        :param location:
-        :param results:
-        :return:
+        :param Path location: location of file to update
+        :param Track results: Track information returned by Spotify
+        :return: None
+        :raises Exception: Error getting or saving track info
         """
 
         try:
@@ -501,7 +515,13 @@ class MPORG:
 
     @wait_if_locked(10)
     def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
-
+        """
+        Update file metadata with the fingerprinter's results
+        :param Path location: location of file to update
+        :param Track results: Track information returned by the fingerprinter
+        :return: None
+        :raises Exception: Error getting or saving track info
+        """
         try:
             metadata = Tagger(location)
         except Exception as e:
@@ -526,73 +546,82 @@ class MPORG:
         save_metadata(metadata)
 
     def save_lyrics(self, location: Path):
+        """
+        Search for a songs lyrics. Save the lyrics alongside the file if it is found
+        :param Path location: Path to file to search for lyrics for
+        :return: None
+        :raises Timout Error: - Timout Occurred writing lyrics
+        :raises Exception: - An Unspecified Error occurred obtaining lyrics
+        """
         # Get Lyrics if available
         lock = self.get_lock(location)
 
         retry_limit = 5
         retry_delay = 2  # seconds
 
+        lyrics = None
+        t = None
         for _ in range(retry_limit):
             try:
                 logging.info(f"Searching for lyrics for {location}")
                 t, lyrics = search_lyrics_by_file(location, lrc=True)
+                break
+            except Exception as e:
+                logging.info(f"{e}, {_}")
+                time.sleep(retry_delay)
+                if _ >= retry_limit - 1:
+                    raise e
+                continue
 
-                if not lyrics:
-                    return None
-                logging.info(f"Lyrics found for {location}. Type {t}.")
-                lyric_file = location.parent
-                filename = location.stem
-                destination = lyric_file / (filename + '.' + t)
+        if not lyrics:
+            return None
 
-                destination_lock = self.get_lock(destination)
+        logging.info(f"Lyrics found for {location}. Type {t}.")
+        lyric_file = location.parent
+        filename = location.stem
+        destination = lyric_file / (filename + '.' + t)
 
-                for _ in range(retry_limit):
+        destination_lock = self.get_lock(destination)
 
-                    if (lyric_file / (filename + ".txt")).exists() or (
-                            lyric_file / (filename + ".lrc")).exists():
-                        txt = lyric_file / (filename + ".txt")
-                        lrc = lyric_file / (filename + ".lrc")
-                        existing = (txt, lrc)
+        if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
+            txt = lyric_file / (filename + ".txt")
+            lrc = lyric_file / (filename + ".lrc")
+            existing = (txt, lrc)
 
-                        for file in existing:
-                            if file.exists():
-                                logging.info(f"A lyrics file already exists for {location}, check if current.")
+            for file in existing:
+                if file.exists():
+                    logging.info(f"A lyrics file already exists for {location}, check if current.")
+                    with open(file, 'r', encoding='utf-8') as f:
+                        if not lyrics == f.read():
+                            logging.info(f"Deleting {file}")
+                            try:
+                                file.unlink()
+                            except Exception as e:
+                                logging.exception(e)
+                                logging.error("Error Unlinking file. Try to Ignore")
+                        else:
+                            logging.info(f"{file} is current")
+                            return
 
-                                with open(file, 'r', encoding='utf-8') as f:
-                                    if not lyrics == f.read():
-                                        logging.info(f"Deleting {file}")
-                                        try:
-                                            file.unlink()
-                                        except TimeoutError as e:
-                                            logging.exception(e)
-                                            logging.error("Error Unlinking file. Try to Ignore")
-                                    else:
-                                        logging.info(f"{file} is current")
-                                        return
+        for _ in range(retry_limit):
+            try:
+                logging.info(f"Writing Lyrics file: {destination}")
+                with acquire(destination_lock, timeout=30):
+                    with open(destination, 'w', encoding="utf-8") as f:
+                        f.write(lyrics)
 
-                    try:
-                        logging.critical(destination)
-                        with acquire(destination_lock, timeout=30):
-                            with open(destination, 'w', encoding="utf-8") as f:
-                                f.write(lyrics)
-
-                        return  # File operations completed successfully, exit the function
-
-                    except TimeoutError:
-                        # Lock acquisition timed out
-                        time.sleep(retry_delay)
-                        continue
-
-                # Retry limit reached for destination lock, file operations failed
-                logging.error(f"Failed to acquire destination lock for {destination}")
+                return  # File operations completed successfully, exit the function
 
             except TimeoutError:
                 # Lock acquisition timed out
                 time.sleep(retry_delay)
                 continue
 
+                # Retry limit reached for destination lock, file operations failed
+        logging.error(f"Failed to acquire destination lock for {destination}")
+
         # Retry limit reached for location lock, file operations failed
-        logging.error(f"Failed to acquire location lock for {location}")
+        #logging.error(f"Failed to acquire location lock for {location}")
 
 
 def _remove_invalid_path_chars(s: str) -> str:
@@ -606,7 +635,7 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     # for the current system. (Works for Unix & Windows)
     # Keep in mind the max FILENAME is 255 chars for Unix though the max PATH is 4096, so unless the root is massive
     # 99% of the path should be unused
-    :param results:
+    :param results: Track object to parse
     :return: tuple of sanitized and truncated album_artist, album_name, track_artist, track_name
     """
 
@@ -665,10 +694,9 @@ def get_valid_spotify_url(strings):
     spotify_track_url = "https://open.spotify.com/track/"
 
     for string in strings:
-        if string and spotify_track_url in string:
-            track_id = string.replace(spotify_track_url, "")
+        if string and spotify_track_url in "".join(string):
+            track_id = "".join(string).replace(spotify_track_url, "")
             track_id = track_id.split('?')[0]  # Remove any trailing params
             return track_id
 
     return None
-
