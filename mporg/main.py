@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from mporg import VERSION
-from mporg.audio_fingerprinter import ACRFingerprinter, MBFingerprinter, get_fingerprinter
+from mporg.audio_fingerprinter import get_fingerprinter
 from mporg.credentials.credentials_manager import CredentialManager
 from mporg.logging_utils.logging_setup import setup_logging
 from mporg.organizer import MPORG
@@ -32,8 +32,6 @@ def main():
 
     setup_logging(args.log_level)
     logging.debug(args)
-
-    print(args.pattern_extension)
 
     if args.version:
         print(VERSION)

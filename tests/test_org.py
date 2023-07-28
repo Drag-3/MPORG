@@ -312,10 +312,11 @@ class TestMPORG(unittest.TestCase):
             call.__setitem__('discnumber', '1'),
             call.__setitem__('comment', 'http://example.com'),
             call.__setitem__('source', 'http://example.com'),
-            call.__setitem__('albumartist', ('Test Artist',)),
+            call.__setitem__('albumartist', 'Test Artist'),
             call.__setitem__('bpm', '120'),
             call.__setitem__('initialkey', 'C'),
-            call.__setitem__('genre', 'Rock')
+            call.__setitem__('genre', 'Rock'),
+            call.save()
         ])
 
         mock_tagger.return_value.save.assert_called_once()
@@ -334,10 +335,11 @@ class TestMPORG(unittest.TestCase):
         mock_tagger.return_value.assert_has_calls([
             call.__setitem__('title', 'Test Track'),
             call.__setitem__('artist', 'Test Artist'),
-            call.__setitem__('albumartist', ('Test Artist',)),
+            call.__setitem__('albumartist', 'Test Artist'),
             call.__setitem__('album', 'Test Album'),
             call.__setitem__('date', '2023'),
-            call.__setitem__('genre', 'Rock')
+            call.__setitem__('genre', 'Rock'),
+            call.save()
         ])
 
         mock_tagger.return_value.save.assert_called_once()
