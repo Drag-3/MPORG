@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1a3] - 2023-07-28
+After every update I recommend deleting the caches in order to make sure you use the live version.
+### Added
+- Added .flac, .ogg, .oga support: The program now supports additional audio file formats, including FLAC, OGG, and OGA.
+- Added `-y` `--lyrics` option: Users can now use the -y or --lyrics option to find and save lyrics along with the music files.
+- Added `-p` `--pattern` option: This option allows users to restrict file types when organizing files. For example, they can separate .mp3 and .flac files into different folders.
+- Check for Spotify URL in metadata: The program now checks if a Spotify URL is available in the metadata of a track. If found, it directly fetches the track instead of attempting a keyword search.
+
+### Changed
+- Replaced Spotipy with requests trying to fix a rate-limiting bug. Currently not sure if spotipy was the problem, but I am too lazy to change it back for now.
+- Program should not skip invalid files ie .txt, and not waste a thread validating them there
+
+### Fixed
+- Tests should now work again :)
+- Program now ignores when unneeded info (genre, audio info) are not taken from spotify. The fields will get default values.
+- The sanitization and path building functions are now platform aware, So that in a Unix system we can potentially have a path up to 4096 chars while windows is limited to 254.
+
+### New Known Bugs
+- [Bug with LyricsSearcher]
+- In the Fingerprinters sometimes the response is not valid json. This currently halts organization for this track, which skips the copying process. Later, make it return None instead of raising an error to fall back to metadata.
+
+### Direction
+- Add an option to delete old files once organized
+- Plugin support ? So that users can add their own fingerprinters.
+- If plugin support is added, move acrcloud to a plugin. This would simply the installation and make it so the base program is totally free.
+
 ## [0.1a2]
 
 ### Added
@@ -66,4 +92,4 @@
 - On linux spotipy complains of cannot read/write from .cache
 
 
-*I'll add bugs as I find them*)
+(*I'll add bugs as I find them*)
