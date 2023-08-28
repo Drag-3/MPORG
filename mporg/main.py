@@ -4,22 +4,26 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
-from mporg import VERSION
+from mporg import VERSION, CONFIG_DIR
 from mporg.audio_fingerprinter import get_fingerprinter
 from mporg.credentials.credentials_manager import CredentialManager
 from mporg.logging_utils.logging_setup import setup_logging
 from mporg.organizer import MPORG
 from mporg.spotify_searcher import SpotifySearcher
 
+import mporg.plugins.utils
+
 
 def main():
+    if not mporg.plugins.PLUGIN_DIR.exists():
+        mporg.plugins.PLUGIN_DIR.mkdir(0o777, parents=True, exist_ok=True)
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-v", "--version", help="Show the version of MPORG and exit.", action="store_true")
     arg_parser.add_argument("-l", "--log_level", help="Logging level for the console screen", type=int, default=3)
-    arg_parser.add_argument("-a", "--acrcloud", help="Use Acrcloud for audio fingerprinting.", action="store_true")
-    arg_parser.add_argument("-m", "--music_brainz", help="Use Musicbrainz for audio fingerprinting.",
-                            action="store_true")
-    arg_parser.add_argument("-f", "--fingerprint", help="Use all fingerprinters (same as -am).", action="store_true")
+
+    arg_parser.add_argument("-f", "--fingerprint", help="Use specifified Fingerprinter")
+    arg_parser.add_argument("-af", "--all_fingerprint", help="Use all fingerprinter plugins")
+
     arg_parser.add_argument("-p", "--pattern_extension", help="Extension(s) to copy over, space separated",
                             default=[], nargs="*")
     arg_parser.add_argument("-y", "--lyrics", help="Attempt to get lyrics and store with file", action="store_true")
@@ -37,9 +41,21 @@ def main():
         print(VERSION)
         sys.exit(0)
 
+    loader = mporg.plugins.utils.PluginLoader()
+    if args.all_fingerprint:
+        loader.load_all_fingerprinters()
+    else:
+        to_load = args.fingerprint
+        try:
+            loader.load_plugin(mporg.plugins.utils.PluginType.FINGERPRINTER, to_load)
+        except Exception:
+            pass
+
     cred_manager = CredentialManager()
-    credentials = cred_manager.get_credentials(use_acr=args.acrcloud or args.fingerprint,
-                                               use_mb=args.music_brainz or args.fingerprint)
+    for plugin in loader.fingerprinters.values():
+        cred_manager.credential_providers.append(plugin.provider(CONFIG_DIR / plugin.provider.CONFIG_NAME))
+
+    credentials = cred_manager.get_credentials()
     spotify_creds = credentials.pop('Spotify')
 
     spotify_searcher = SpotifySearcher(spotify_creds["cid"], spotify_creds["secret"])

@@ -14,8 +14,8 @@ class CredentialManager:
     def __init__(self):
         self.credential_providers = [
             SpotifyCredentialProvider(CONFIG_DIR / 'spotify.json'),
-            ACRCloudCredentialProvider(CONFIG_DIR / "acrcloud.json"),
-            AcoustIDCredentialProvider(CONFIG_DIR / "acoustid.json")
+            #ACRCloudCredentialProvider(CONFIG_DIR / "acrcloud.json"),
+            #AcoustIDCredentialProvider(CONFIG_DIR / "acoustid.json")
         ]
 
     def create_directories_and_files(self):
@@ -34,12 +34,6 @@ class CredentialManager:
         credentials = {}
 
         for provider in self.credential_providers:
-            if isinstance(provider, ACRCloudCredentialProvider) and not use_acr:
-                credentials[provider.PNAME] = None
-                continue
-            if isinstance(provider, AcoustIDCredentialProvider) and not use_mb:
-                credentials[provider.PNAME] = None
-                continue
 
             provider_credentials = provider.get_credentials()
 
