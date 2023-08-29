@@ -1,33 +1,16 @@
 import importlib
+import inspect
 import os
 import sys
-from abc import abstractmethod
-from dataclasses import dataclass
-from enum import Enum
-from importlib.machinery import SourceFileLoader
-from pathlib import Path
 
 from mporg.plugins import FINGERPRINTER_DIR, PLUGIN_DIR
-from mporg.credentials.providers import CredentialProvider
-import inspect
+from mporg.plugins.util import PluginType, PluginInfo
 
 
 def get_class_by_pattern(module, pattern):
     classes = inspect.getmembers(module, inspect.isclass)
     matching = [cls for cls_name, cls in classes if pattern in cls_name]
     return matching
-
-
-@dataclass
-class PluginInfo:
-    plugin: object
-    provider: CredentialProvider
-
-
-class PluginType(Enum):
-    FINGERPRINTER = "FingerprinterPlugins"
-    SEARCHER = "SearcherPlugins"
-    LYRICS = "LyricsPlugins"
 
 
 class PluginLoader:
