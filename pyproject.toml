@@ -27,4 +27,4 @@ packages = ['mporg', 'mporg.credentials', 'mporg.logging_utils', 'mporg.plugins'
 [tool.setuptools.dynamic]
 version = {attr = "mporg.VERSION"}
 dependencies = {file = ["requirements.txt"]}
-optional-dependencies = {file = ["requirements_tests.txt"]}
+optional-dependencies = {tests ={file = ["requirements_tests.txt"]}}
