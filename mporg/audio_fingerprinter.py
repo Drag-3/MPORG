@@ -12,7 +12,7 @@ from acoustid import fingerprint_file, lookup, FingerprintGenerationError
 from acrcloud.recognizer import ACRCloudRecognizer
 
 from mporg import CONFIG_DIR, VERSION
-from mporg.spotify_searcher import Track
+from mporg.types import Track
 
 logging.getLogger('__main.' + __name__)
 logging.propagate = True

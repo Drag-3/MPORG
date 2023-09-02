@@ -9,17 +9,12 @@ from mporg.audio_fingerprinter import get_fingerprinter
 from mporg.credentials.credentials_manager import CredentialManager
 from mporg.logging_utils.logging_setup import setup_logging
 from mporg.organizer import MPORG
-from mporg.plugins import PLUGIN_DIR
-from mporg.plugins.util import PluginType
 from mporg.plugins.plugin_loader import PluginLoader
+from mporg.plugins.util import PluginType, setup_and_check_plugins
 from mporg.spotify_searcher import SpotifySearcher
-
-import mporg.plugins.util
 
 
 def main():
-    if not PLUGIN_DIR.exists():
-        mporg.plugins.PLUGIN_DIR.mkdir(0o777, parents=True, exist_ok=True)
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-v", "--version", help="Show the version of MPORG and exit.", action="store_true")
     arg_parser.add_argument("-l", "--log_level", help="Logging level for the console screen", type=int, default=3)
@@ -44,6 +39,7 @@ def main():
         print(VERSION)
         sys.exit(0)
 
+    setup_and_check_plugins()
     loader = PluginLoader()
     if args.all_fingerprint:
         loader.load_all_fingerprinters()

@@ -3,7 +3,6 @@ import logging
 import random
 import threading
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, date
 
 import diskcache
@@ -12,6 +11,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from mporg import CONFIG_DIR
+from mporg.types import Track
 
 PITCH_CODES = {
     0: 'C',
@@ -39,25 +39,6 @@ def json_serial(obj):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError("Type %s not serializable" % type(obj))
-
-
-@dataclass(frozen=True)
-class Track:
-    track_name: str = None
-    track_number: int = None
-    track_year: str = None
-    track_key: str = None
-    track_bpm: str = None
-    track_disk: int = None
-    track_artists: tuple[str, ...] = None
-    album_name: str = None
-    album_artists: tuple[str, ...] = None
-    album_year: str = None
-    album_size: int = None
-    track_url: str = None
-    album_genres: str = None
-    track_id: str = None
-    album_id: str = None
 
 
 locks = {}

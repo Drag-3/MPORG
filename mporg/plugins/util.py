@@ -34,8 +34,8 @@ class PluginType(Enum):
 
 
 default_plugin_urls = {
-    "fingerprinter": "https://raw.githubusercontent.com/"
-                     "Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/MBFingerprinter/plugin.json",
+    PluginType.FINGERPRINTER: "https://raw.githubusercontent.com/"
+                              "Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/MBFingerprinter/plugin.json",
 }
 
 
@@ -45,18 +45,11 @@ def get_plugin_info(url: str):
     content = resp.json()
 
     name = content.get("name")
-    type = content.get("type")
+    type = content.get("type") + "s"
     dependancies = content.get("dependencies")
     modules = content.get("modules")
 
-    if type == "FingerprinterPlugin":
-        plugin_dir = PLUGIN_DIR / os.path.join("FingerprinterPlugins", name)
-    elif type == "SearcherPlugin":
-        plugin_dir = PLUGIN_DIR / os.path.join("SearcherPlugins", name)
-    elif type == "LyricsPlugin":
-        plugin_dir = PLUGIN_DIR / os.path.join("LyricsPlugins", name)
-    else:
-        raise ValueError("Invalid plugin type")
+    plugin_dir = get_plugin_dir(PluginType(type), name)
 
     if not plugin_dir.exists():
         plugin_dir.mkdir(0o777, parents=True, exist_ok=True)
@@ -89,6 +82,45 @@ def install_plugin(source: str):
 def install_default_plugins():
     for url in default_plugin_urls.values():
         install_plugin(url)
+
+
+def get_plugin_dir(plugin_type, plugin_name):
+    if plugin_type == PluginType.FINGERPRINTER:
+        return PLUGIN_DIR / "FingerprinterPlugins" / plugin_name
+    elif plugin_type == PluginType.SEARCHER:
+        return PLUGIN_DIR / "SearcherPlugins" / plugin_name
+    elif plugin_type == PluginType.LYRICS:
+        return PLUGIN_DIR / "LyricsPlugins" / plugin_name
+    else:
+        raise ValueError("Invalid plugin type")
+
+
+def check_default_plugins():
+    for plugin_type, url in default_plugin_urls.items():
+        # Determine the plugin name from the URL
+        plugin_name = url.split("/")[-2]
+
+        # Create the plugin directory path
+        plugin_dir = get_plugin_dir(plugin_type, plugin_name)
+
+        # Check if the plugin directory exists
+        if not plugin_dir.exists():
+            # If the directory does not exist, install the plugin
+            install_plugin(url)
+        else:
+            # If the directory exists, check if the plugin.json file exists
+            plugin_json_file = plugin_dir / "plugin.json"
+            if not plugin_json_file.exists():
+                # If the plugin.json file does not exist, install the plugin
+                install_plugin(url)
+
+
+def setup_and_check_plugins():
+    if not PLUGIN_DIR.exists():
+        PLUGIN_DIR.mkdir(0o777, parents=True, exist_ok=True)
+
+    # Verify default plugins
+    check_default_plugins()
 
 
 if __name__ == "__main__":

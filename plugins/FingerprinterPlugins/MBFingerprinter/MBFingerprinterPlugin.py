@@ -11,7 +11,7 @@ from ftfy import ftfy
 from mporg import CONFIG_DIR, VERSION
 from mporg.audio_fingerprinter import Fingerprinter
 from mporg.credentials.providers import CredentialProvider
-from mporg.spotify_searcher import Track
+from mporg.types import Track
 
 
 class MBFingerprinter(Fingerprinter):

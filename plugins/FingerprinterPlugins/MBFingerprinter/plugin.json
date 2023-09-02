@@ -1,5 +1,5 @@
 {
-    "name": "MBFingerprinterPlugin",
+    "name": "MBFingerprinter",
     "type": "FingerprinterPlugin",
     "dependencies": ["diskcache", "musicbrainzngs", "ftfy", "requests", "pyacoustid"],
     "modules": [
