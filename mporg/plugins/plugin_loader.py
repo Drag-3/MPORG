@@ -4,7 +4,7 @@ import os
 import sys
 
 from mporg.plugins import FINGERPRINTER_DIR, PLUGIN_DIR
-from mporg.plugins.util import PluginType, PluginInfo
+from mporg.plugins.util import PluginType, Plugin
 
 
 def get_class_by_pattern(module, pattern):
@@ -33,7 +33,7 @@ class PluginLoader:
             fingerprinter = getattr(module, plugin_name)
             cred = get_class_by_pattern(module, "CredentialProvider")[0]
 
-            self.fingerprinters[plugin_name] = PluginInfo(fingerprinter, cred)
+            self.fingerprinters[plugin_name] = Plugin(fingerprinter, cred)
         except (ModuleNotFoundError, AttributeError) as e:
             print(e)
 
