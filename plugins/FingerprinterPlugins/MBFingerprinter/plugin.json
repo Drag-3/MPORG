@@ -5,7 +5,7 @@
     "modules": [
         {
             "name": "MBFingerprinterPlugin.py",
-            "url": "https://github.com/user/fingerprinter-plugin/module1.py"
+            "url": "https://raw.githubusercontent.com/Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/MBFingerprinter/MBFingerprinterPlugin.py"
         }
       ]
 }
