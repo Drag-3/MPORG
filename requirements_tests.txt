@@ -5,7 +5,7 @@ mutagen~=1.46.0
 pyacoustid~=1.2.2
 requests==2.31.0
 urllib3==2.0.4
-LyricsSerarcher @ git+https://github.com/Drag-3/LyricsSearcher.git
+LyricsSearcher @ git+https://github.com/Drag-3/LyricsSearcher.git
 tqdm~=4.65.0
 # Linux requirements
 pyacrcloud~=1.0.1; sys_platform == 'linux'
