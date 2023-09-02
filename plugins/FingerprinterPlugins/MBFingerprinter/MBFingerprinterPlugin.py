@@ -173,6 +173,7 @@ class AcoustIDCredentialProvider(CredentialProvider):
                 return None
             credentials = {"api": api_key}
 
+        self.store_credentials(credentials)
         return credentials
 
     def verify_credentials(self, credentials):
