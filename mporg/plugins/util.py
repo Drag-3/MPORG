@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 
 from mporg.credentials.providers import CredentialProvider
 
@@ -20,16 +22,10 @@ class PluginType(Enum):
 
 
 default_plugin_urls = {
-    "fingerprinter": "https://github.com/yourusername/yourpluginrepo/plugin1.zip",
+    "fingerprinter": "https://raw.githubusercontent.com/Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins"
+                     "/MBFingerprinterPlugin.py",
 }
 
 
-def download_plugins(plugin_urls, destination_folder):
-    os.makedirs(destination_folder, exist_ok=True)
-    for url in plugin_urls:
-        response = requests.get(url)
-        if response.status_code == 200:
-            plugin_filename = url.split("/")[-1]
-            plugin_path = os.path.join(destination_folder, plugin_filename)
-            with open(plugin_path, "wb") as f:
-                f.write(response.content)
+if __name__ == "__main__":
+    download_plugins(default_plugin_urls.values(), "")

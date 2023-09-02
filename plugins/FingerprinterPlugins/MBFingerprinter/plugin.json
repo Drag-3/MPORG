@@ -1,0 +1,10 @@
+{
+    "type": "FingerprinterPlugin",
+    "dependencies": ["diskcache", "musicbrainzngs", "ftfy", "requests", "pyacoustid"],
+    "modules": [
+        {
+            "name": "MBFingerprinterPlugin.py",
+            "url": "https://github.com/user/fingerprinter-plugin/module1.py"
+        }
+      ]
+}
