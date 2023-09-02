@@ -10,7 +10,7 @@ from mporg.credentials.credentials_manager import CredentialManager
 from mporg.logging_utils.logging_setup import setup_logging
 from mporg.organizer import MPORG
 from mporg.plugins.plugin_loader import PluginLoader
-from mporg.plugins.util import PluginType, setup_and_check_plugins
+from mporg.plugins.util import PluginType, setup_and_check_plugins, install_plugin
 from mporg.spotify_searcher import SpotifySearcher
 
 
@@ -26,9 +26,14 @@ def main():
                             default=[], nargs="*")
     arg_parser.add_argument("-y", "--lyrics", help="Attempt to get lyrics and store with file", action="store_true")
 
+    # Add a new argument for installing plugins
+    arg_parser.add_argument("--install-plugins", nargs="+", metavar="URL",
+                            help="Install one or more plugins from the provided URLs")
+
     arg_parser.add_argument("store_path", default=Path.home() / os.path.join("Music", "TuneTagLibrary"),
                             help="Root of area to store organized files", nargs='?')
     arg_parser.add_argument("search_path", default=Path.cwd(), help="Source dir to look for mp3 files in.", nargs='?')
+
 
     args = arg_parser.parse_args()
 
@@ -37,6 +42,12 @@ def main():
 
     if args.version:
         print(VERSION)
+        sys.exit(0)
+
+    if args.install_plugins:
+        for plugin_url in args.install_plugins:
+            install_plugin(plugin_url)
+        print(f"{len(args.install_plugins)} Plugins installed, exiting")
         sys.exit(0)
 
     setup_and_check_plugins()
