@@ -10,5 +10,5 @@ lyrics @ https://github.com/Drag-3/LyricsSearcher.git
 pyacrcloud~=1.0.1; sys_platform == 'linux'
 
 # Windows requirements
-acr_windows @ https://github.com/acrcloud/acrcloud_sdk_python;sys_platform == 'win32'
+acr_windows @ https://github.com/acrcloud/acrcloud_sdk_python.git; sys_platform == 'win32'
 tqdm~=4.66.1
