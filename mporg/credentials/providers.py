@@ -181,59 +181,10 @@ class ACRCloudCredentialProvider(CredentialProvider):
             return False
 
 
-class AcoustIDCredentialProvider(CredentialProvider):
-    SPEC = {"api": lambda x: len(x) > 0}
-    PNAME = "AcoustID"
-
-    def get_credentials(self):
-        credentials = self._load_from_file()
-        if (
-            credentials
-            and self.verify_spec(credentials)
-            and self.verify_credentials(credentials)
-        ):
-            return credentials
-
-        print("Getting AcoustID Credentials. Enter q to skip this fingerprinter..")
-        while (
-            not credentials
-            or not self.verify_spec(credentials)
-            or not self.verify_credentials(credentials)
-        ):
-            api_key = input("Enter your AcoustID API Key: ")
-            if api_key.lower() == "q":
-                return None
-            credentials = {"api": api_key}
-
-        return credentials
-
-    def verify_credentials(self, credentials):
-        url = "https://api.acoustid.org/v2/lookup"
-        params = {
-            "client": credentials.get("api"),
-            "format": "json",
-            "duration": 30,
-            "fingerprint": "dummy",
-        }
-
-        try:
-            response = requests.get(url, params=params)
-            data = response.json()
-            if data.get("code") != 4:
-                logging.top("AcoustID credentials are valid.")
-                return True
-        except requests.exceptions.RequestException as e:
-            logging.error("Error Connecting to AcoustID:", str(e))
-            return False
-        logging.warning("AcoustID Api key is incorrect")
-        return False
-
 
 if __name__ == "__main__":
     spotify = SpotifyCredentialProvider(mporg.CONFIG_DIR / "spotify.json")
     acrcloud = ACRCloudCredentialProvider(mporg.CONFIG_DIR / "acrcloud.json")
-    acoustid = AcoustIDCredentialProvider(mporg.CONFIG_DIR / "acoustid.json")
 
     print(spotify.get_credentials())
     print(acrcloud.get_credentials())
-    print(acoustid.get_credentials())
