@@ -10,7 +10,7 @@ LOG_LEVEL_MAPPING = {
     2: logging.INFO,
     3: logging.WARNING,
     4: logging.ERROR,
-    5: logging.CRITICAL
+    5: logging.CRITICAL,
 }
 
 
@@ -44,11 +44,11 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
         methodName = levelName.lower()
 
     if hasattr(logging, levelName):
-        raise AttributeError('{} already defined in logging module'.format(levelName))
+        raise AttributeError("{} already defined in logging module".format(levelName))
     if hasattr(logging, methodName):
-        raise AttributeError('{} already defined in logging module'.format(methodName))
+        raise AttributeError("{} already defined in logging module".format(methodName))
     if hasattr(logging.getLoggerClass(), methodName):
-        raise AttributeError('{} already defined in logger class'.format(methodName))
+        raise AttributeError("{} already defined in logger class".format(methodName))
 
     # This method was inspired by the answers to Stack Overflow post
     # http://stackoverflow.com/q/2183233/2988730, especially
@@ -86,10 +86,16 @@ def setup_logging(log_lvl_input: int):
 
     addLoggingLevel("TOP", logging.CRITICAL - 1)
     # Create a formatter
-    c_formatter = ColoredFormatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
-    formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s')
+    c_formatter = ColoredFormatter(
+        "%(asctime)s - %(module)s - %(levelname)s - %(message)s"
+    )
+    formatter = logging.Formatter(
+        "%(asctime)s - %(module)s - %(levelname)s - %(message)s"
+    )
     # Create a file handler and set the formatter
-    file_handler = RotatingFileHandler(LOG_DIR / 'MPORG.log', maxBytes=1000000, backupCount=5, encoding='utf-8')
+    file_handler = RotatingFileHandler(
+        LOG_DIR / "MPORG.log", maxBytes=1000000, backupCount=5, encoding="utf-8"
+    )
     file_handler.setLevel(logging.DEBUG if log_lvl <= logging.DEBUG else logging.INFO)
     file_handler.setFormatter(formatter)
 

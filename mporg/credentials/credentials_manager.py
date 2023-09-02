@@ -3,19 +3,22 @@ import os
 from pprint import pprint
 
 from mporg import CONFIG_DIR
-from mporg.credentials.providers import SpotifyCredentialProvider, ACRCloudCredentialProvider, \
-    AcoustIDCredentialProvider
+from mporg.credentials.providers import (
+    SpotifyCredentialProvider,
+    ACRCloudCredentialProvider,
+    AcoustIDCredentialProvider,
+)
 
-logging.getLogger('__main__.' + __name__)
+logging.getLogger("__main__." + __name__)
 logging.propagate = True
 
 
 class CredentialManager:
     def __init__(self):
         self.credential_providers = [
-            SpotifyCredentialProvider(CONFIG_DIR / 'spotify.json'),
-            #ACRCloudCredentialProvider(CONFIG_DIR / "acrcloud.json"),
-            #AcoustIDCredentialProvider(CONFIG_DIR / "acoustid.json")
+            SpotifyCredentialProvider(CONFIG_DIR / "spotify.json"),
+            # ACRCloudCredentialProvider(CONFIG_DIR / "acrcloud.json"),
+            # AcoustIDCredentialProvider(CONFIG_DIR / "acoustid.json")
         ]
 
     def create_directories_and_files(self):
@@ -34,7 +37,6 @@ class CredentialManager:
         credentials = {}
 
         for provider in self.credential_providers:
-
             provider_credentials = provider.get_credentials()
 
             credentials[provider.PNAME] = provider_credentials
@@ -42,7 +44,6 @@ class CredentialManager:
         return credentials
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     manager = CredentialManager()
     print(manager.get_credentials())
-

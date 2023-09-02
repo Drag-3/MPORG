@@ -1,9 +1,11 @@
 import importlib
 import inspect
-import os
 import sys
+import logging
 from pathlib import Path
 
+from mporg.audio_fingerprinter import Fingerprinter
+from mporg.credentials.providers import CredentialProvider
 from mporg.plugins import FINGERPRINTER_DIR, PLUGIN_DIR
 from mporg.plugins.util import PluginType, Plugin
 
@@ -23,6 +25,7 @@ class PluginLoader:
     def fingerprinter_from_file(self, file: Path):
         module_name = file.stem
         plugin_name = module_name.replace("Plugin", "")
+        logging.debug(f"Loading fingerprinter {plugin_name} from {file}")
 
         try:
             spec = importlib.util.spec_from_file_location(module_name, FINGERPRINTER_DIR / file)
@@ -34,7 +37,21 @@ class PluginLoader:
             fingerprinter = getattr(module, plugin_name)
             cred = get_class_by_pattern(module, "CredentialProvider")[0]
 
+            fingerprinter_valid = issubclass(fingerprinter, Fingerprinter)
+            logging.debug(f"Fingerprinter valid: {fingerprinter_valid}")
+
+            if cred:
+                credential_provider_valid = issubclass(cred, CredentialProvider)
+                logging.debug(f"CredentialProvider valid: {credential_provider_valid}")
+            else:
+                credential_provider_valid = True
+
+            if not fingerprinter_valid and credential_provider_valid:
+                logging.warning(f"Invalid Fingerprinter or CredentialProvider")
+                raise Exception("Invalid Fingerprinter or CredentialProvider")
+
             self.fingerprinters[plugin_name] = Plugin(fingerprinter, cred)
+            logging.debug(f"Loaded fingerprinter {plugin_name} from {file}")
         except (ModuleNotFoundError, AttributeError) as e:
             print(e)
 
