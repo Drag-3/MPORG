@@ -1,4 +1,4 @@
-diskcache~=5.6.1
+diskcache~=5.6.3
 ftfy~=6.1.1
 musicbrainzngs~=0.7.1
 mutagen~=1.46.0
@@ -11,4 +11,4 @@ pyacrcloud~=1.0.1; sys_platform == 'linux'
 
 # Windows requirements
 acr_windows @ https://github.com/acrcloud/acrcloud_sdk_python;sys_platform == 'win32'
-tqdm
+tqdm~=4.66.1
