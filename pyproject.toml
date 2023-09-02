@@ -38,7 +38,7 @@ tests = [
 mporg = "mporg.main:main"
 
 [tool.setuptools]
-packages = ['mporg']
+packages = ['mporg', 'credentials', 'logging_utils', 'plugins']
 
 [tool.setuptools.dynamic]
 version = {attr = "mporg.VERSION"}
