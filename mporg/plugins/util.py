@@ -23,7 +23,7 @@ class PluginInfo:
     name: str
     type: str
     dependancies: list[str]
-    modules: {str, str}
+    modules: list[{str, str}]
     dir: Path
 
 
@@ -46,7 +46,7 @@ def get_plugin_info(url: str):
 
     name = content.get("name")
     type = content.get("type")
-    dependancies = content.get("dependancies")
+    dependancies = content.get("dependencies")
     modules = content.get("modules")
 
     if type == "FingerprinterPlugin":
@@ -74,7 +74,7 @@ def install_plugin_dependancies(plugin: PluginInfo):
 
 def install_plugin_modules(plugin: PluginInfo):
     for package in plugin.modules:
-        content = requests.get(package).text
+        content = requests.get(package.get("url")).text
 
         with open(plugin.dir / package.get("name"), "w") as f:
             f.write(content)
