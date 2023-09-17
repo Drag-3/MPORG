@@ -101,8 +101,8 @@ def main():
         to_load = args.fingerprint
         try:
             loader.load_plugin(PluginType.FINGERPRINTER, to_load)
-        except Exception:
-            pass
+        except Exception as e:  # Catch any uncaught exceptions loading Plugins Log and ignore
+            logging.error(f"Error loading plugin. {e}")
 
     cred_manager = CredentialManager()
     for plugin in loader.fingerprinters.values():

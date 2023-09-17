@@ -1,12 +1,9 @@
 import logging
 import os
-from pprint import pprint
 
 from mporg import CONFIG_DIR
 from mporg.credentials.providers import (
     SpotifyCredentialProvider,
-    ACRCloudCredentialProvider,
-    AcoustIDCredentialProvider,
 )
 
 logging.getLogger("__main__." + __name__)
@@ -31,7 +28,7 @@ class CredentialManager:
                 provider.credential_file.touch(0o666)
                 logging.debug(f"Creating {provider.credential_file}")
 
-    def get_credentials(self, use_acr=False, use_mb=False):
+    def get_credentials(self):
         self.create_directories_and_files()
 
         credentials = {}

@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 import logging
+import rich
 
 import requests
+from rich.markdown import Markdown
 
 from mporg.credentials.providers import CredentialProvider
 from mporg.plugins import PLUGIN_DIR
@@ -23,6 +25,7 @@ class PluginInfo:
     dependancies: list[str]
     modules: list[{str, str}]
     dir: Path
+    readme: bool = False
 
 
 class PluginType(Enum):
@@ -44,11 +47,12 @@ def get_plugin_info(url: str):
 
     logging.debug(f"Plugin JSON: {content}")
     name = content.get("name")
-    type = content.get("type") + "s"
+    plugin_type = content.get("type") + "s"
+    readme_url = content.get("readme")
     dependancies = content.get("dependencies")
     modules = content.get("modules")
 
-    plugin_dir = get_plugin_dir(PluginType(type), name)
+    plugin_dir = get_plugin_dir(PluginType(plugin_type), name)
     logging.debug(f"Plugin dir: {plugin_dir}")
 
     if not plugin_dir.exists():
@@ -57,7 +61,11 @@ def get_plugin_info(url: str):
     with open(plugin_dir / "plugin.json", "w") as f:
         f.write(resp.text)
 
-    return PluginInfo(name, type, dependancies, modules, plugin_dir)
+    if readme_url:  # Write the README.md file if it exists
+        with open(plugin_dir / "README.md", "w") as f:
+            f.write(requests.get(readme_url).text)
+
+    return PluginInfo(name, plugin_type, dependancies, modules, plugin_dir, readme_url is not None)
 
 
 def install_plugin_dependencies(plugin: PluginInfo):
@@ -99,6 +107,11 @@ def install_plugin_modules(plugin: PluginInfo):
 def install_plugin(source: str):
     plugin = get_plugin_info(source)
     logging.info(f"Installing plugin: {plugin.name}")
+    if plugin.readme:
+        display_markdown(plugin.dir / "README.md")
+        rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue")
+        input()
+
     install_plugin_dependencies(plugin)
     install_plugin_modules(plugin)
     logging.info(f"Plugin {plugin.name} installed successfully.")
@@ -167,5 +180,12 @@ def setup_and_check_plugins():
     logging.info("Default plugins verified.")
 
 
+def display_markdown(md_file: Path):
+
+    with open(md_file, 'r', encoding='utf-8') as file:
+        console = rich.get_console()
+        console.print(Markdown(file.read()))
+
+
 if __name__ == "__main__":
-    install_default_plugins()
+    display_markdown("/home/justin/PycharmProjects/MP3ORG/plugins/FingerprinterPlugins/MBFingerprinter/README.md")

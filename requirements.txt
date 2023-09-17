@@ -1,7 +1,7 @@
 diskcache~=5.6.3
 ftfy~=6.1.1
 musicbrainzngs~=0.7.1
-mutagen~=1.46.0
+mutagen==1.47.0
 pyacoustid~=1.2.2
 requests~=2.31.0
 urllib3==2.0.4

@@ -1,6 +1,7 @@
 {
     "name": "MBFingerprinter",
     "type": "FingerprinterPlugin",
+    "readme": "https://raw.githubusercontent.com/Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/MBFingerprinter/README.md",
     "dependencies": ["diskcache", "musicbrainzngs", "ftfy", "requests", "pyacoustid"],
     "modules": [
         {
