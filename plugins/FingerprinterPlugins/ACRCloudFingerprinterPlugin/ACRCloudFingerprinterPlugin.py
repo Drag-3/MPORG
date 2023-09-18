@@ -122,15 +122,15 @@ class ACRCloudCredentialProvider(CredentialProvider):
         ):
             host = input("Enter the ACRCloud host: ").strip().lower()
             if host == "q":
-                return None
+                return {}
 
             key = input("Enter your ACRCloud access key: ").strip().lower()
             if key == "q":
-                return None
+                return {}
 
             secret = input("Enter your ACRCloud access secret: ").strip().lower()
             if secret == "q":
-                return None
+                return {}
 
             credentials = {
                 "host": host,
