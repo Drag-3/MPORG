@@ -1,6 +1,15 @@
 # Changelog
 
-## [0.2a1] - 2023-09-20
+## [0.2a2] - 2023-09-18
+### Added
+- Nada
+
+### Changed
+- Moved ACRCloud functionality to plugin as planned. Removed dependencies for base program.
+
+### Fixed
+- README plugin description
+## [0.2a1] - 2023-09-18
 ### Added
 - Plugins: Users can now add their own fingerprinters. This allows them to use their own API keys and services. See the [README](README.md) for more information.
 - Added `--install-plugin` option: Users can now install plugins from the command line by entering the url of the plugin.

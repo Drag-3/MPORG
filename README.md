@@ -111,10 +111,7 @@ To utilize MPORG's features, you need to set up a Spotify developer account to o
 2. Obtain your client ID and secret from the developer dashboard.
 
 
-For audio fingerprinting, MPORG relies on ACRCloud and AcoustID. Here's how to set them up:
-
-1. Sign up for ACRCloud's [service](https://console.acrcloud.com). Please note that ACRCloud is a paid API.
-2. To acquire an AcoustID API key, register your application with [AcoustID](https://acoustid.org/new-application). The AcoustID and MusicBrainz APIs are free to use.
+For audio fingerprinting, MPORG relies on plugins. Please refer to the README of the plugin you are using for instructions on how to obtain credentials.
 
 
 ## Plugins
@@ -159,13 +156,22 @@ Any amount of imports or setup can be made as long as these two methods are impl
 ##### Example
 ```python
 #MyFingerprinterPlugin.py
-from mporg.audio_fingerprinter import Fingerprinter
-from mporg.types import Track
+from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
+from mporg.credentials.providers import CredentialProvider
 
 class MyFingerprintPlugin(Fingerprinter):
     def fingerprint(self, file_path):
         # Do fingerprinting here
-        return Track() # Return a Track object with information about the file
+        return FingerprintResult() # Return a FingerprintResult object with information about the file
+
+class MyCredentialProvider(CredentialProvider):
+    def __getcredentials(self):
+        # Get credentials here
+        return {"key": "value"} # Return a dictionary containing the credentials
+
+    def verify_credentials(self, credentials: dict):
+        # Verify credentials here
+        return True # Return a boolean indicating whether the credentials are valid
 ```
 
 #### Plugin Repos

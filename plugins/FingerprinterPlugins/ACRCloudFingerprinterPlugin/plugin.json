@@ -1,0 +1,13 @@
+{
+  "name": "ACRCloudFingerprinter",
+  "type": "FingerprinterPlugin",
+  "readme": "update_this_url",
+  "dependencies": ["pyacrcloud @ https://github.com/acrcloud/acrcloud_sdk_python.git ; sys_platform == 'win32'", "pyacrcloud; sys_platform == 'linux'", "diskcache", "ftfy"],
+
+  "modules": [
+    {
+      "name": "ACRCloudFingerprinterPlugin.py",
+      "url": ".update_this_url"
+    }
+  ]
+}

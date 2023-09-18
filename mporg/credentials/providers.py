@@ -2,7 +2,6 @@ import json
 import logging
 
 import requests
-from acrcloud.recognizer import ACRCloudRecognizer
 
 import mporg
 
@@ -123,94 +122,7 @@ class SpotifyCredentialProvider(CredentialProvider):
             return False
 
 
-class ACRCloudCredentialProvider(CredentialProvider):
-    SPEC = {
-        "host": lambda x: ".acrcloud.com" in x,  # host must contain .acrcloud.com
-        "access_key": lambda x: len(x) > 0,  # access_key must not be empty
-        "access_secret": lambda x: len(x) > 0,  # access_secret must not be empty
-    }
-    PNAME = "ACRCloud"
-
-    def get_credentials(self):
-        # Try to get and verify credentials
-        credentials = self._load_from_file()
-        if (
-            credentials
-            and self.verify_spec(credentials)
-            and self.verify_credentials(credentials)
-        ):
-            return credentials
-
-        # Ask user for ACRCloud credentials
-        print("Getting ACRCloud Credentials. Enter q to skip this fingerprinter..")
-        while (
-            not credentials
-            or not self.verify_spec(credentials)
-            or not self.verify_credentials(credentials)
-        ):
-            host = input("Enter the ACRCloud host: ")
-            if host.lower() == "q":
-                return None
-
-            key = input("Enter your ACRCloud access key: ")
-            if key.lower() == "q":
-                return None
-
-            secret = input("Enter your ACRCloud access secret: ")
-            if secret.lower() == "q":
-                return None
-
-            credentials = {
-                "access_key": key,
-                "access_secret": secret,
-                "secret": secret,
-                "debug": False,
-                "timeout": 10,
-            }
-
-        return credentials
-
-    def verify_credentials(self, credentials):
-        config = credentials
-        recognizer = ACRCloudRecognizer(config)
-
-        try:
-            #
-            dummy_fingerprint = {"sample": b"A"}  #Use a dummy fingerprint because ACRCloud requires a sample
-
-            # Use the do_recogize() method to verify credentials
-            result = recognizer.do_recogize(
-                config.get("host"),
-                dummy_fingerprint,
-                "fingerprint",
-                config.get("access_key"),
-                config.get("access_secret"),
-                10,
-            )
-
-            result = json.loads(result)
-            if (
-                result["status"]["code"] == 1001
-                and result["status"]["msg"] == "No result"  # The key and secret are valid if the result is "No result"
-            ):
-                logging.top("ACRCloud credentials are valid.")
-                return True
-            else:
-                logging.warning(
-                    "ACRCloud credentials are invalid:", result["status"]["msg"]
-                )
-                return False
-        except Exception as e:
-            logging.warning(
-                "Error occurred while verifying ACRCloud credentials:", str(e)
-            )
-            return False
-
-
-
 if __name__ == "__main__":
     spotify = SpotifyCredentialProvider(mporg.CONFIG_DIR / "spotify.json")
-    acrcloud = ACRCloudCredentialProvider(mporg.CONFIG_DIR / "acrcloud.json")
 
     print(spotify.get_credentials())
-    print(acrcloud.get_credentials())

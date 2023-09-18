@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 
 import diskcache
@@ -9,7 +8,7 @@ from acoustid import fingerprint_file, lookup, FingerprintGenerationError
 from ftfy import ftfy
 
 from mporg import CONFIG_DIR, VERSION
-from mporg.audio_fingerprinter import Fingerprinter
+from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 from mporg.credentials.providers import CredentialProvider
 from mporg.types import Track
 
@@ -147,13 +146,6 @@ class MBFingerprinter(Fingerprinter):
             if int(tag.get('count', 0)) >= 1:
                 t_names.add(tag.get('name'))
         return list(t_names)
-
-
-@dataclass
-class FingerprintResult:
-    code: int = None
-    type: str = None
-    results: Track | dict = None
 
 
 class AcoustIDCredentialProvider(CredentialProvider):
