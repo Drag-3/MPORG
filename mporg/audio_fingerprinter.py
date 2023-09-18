@@ -1,14 +1,8 @@
-import json
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
-import diskcache
-from acrcloud.recognizer import ACRCloudRecognizer
-from ftfy import ftfy
-
-from mporg import CONFIG_DIR
 from mporg.types import Track
 
 logging.getLogger("__main." + __name__)
