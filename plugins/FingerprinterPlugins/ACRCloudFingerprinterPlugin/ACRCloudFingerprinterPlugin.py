@@ -120,19 +120,20 @@ class ACRCloudCredentialProvider(CredentialProvider):
             or not self.verify_spec(credentials)
             or not self.verify_credentials(credentials)
         ):
-            host = input("Enter the ACRCloud host: ")
-            if host.lower() == "q":
+            host = input("Enter the ACRCloud host: ").strip().lower()
+            if host == "q":
                 return None
 
-            key = input("Enter your ACRCloud access key: ")
-            if key.lower() == "q":
+            key = input("Enter your ACRCloud access key: ").strip().lower()
+            if key == "q":
                 return None
 
-            secret = input("Enter your ACRCloud access secret: ")
-            if secret.lower() == "q":
+            secret = input("Enter your ACRCloud access secret: ").strip().lower()
+            if secret == "q":
                 return None
 
             credentials = {
+                "host": host,
                 "access_key": key,
                 "access_secret": secret,
                 "secret": secret,
