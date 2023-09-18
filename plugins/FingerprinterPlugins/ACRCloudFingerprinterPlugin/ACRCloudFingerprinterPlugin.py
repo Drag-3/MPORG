@@ -12,7 +12,7 @@ from mporg.credentials.providers import CredentialProvider
 from mporg.types import Track
 
 
-class ACRFingerprinter(Fingerprinter):
+class ACRCloudFingerprinter(Fingerprinter):
     def __init__(self, config: dict):
         self.acrcloud = ACRCloudRecognizer(config)
         self.cache = diskcache.Cache(directory=str(CONFIG_DIR / "audiocache_A"))
