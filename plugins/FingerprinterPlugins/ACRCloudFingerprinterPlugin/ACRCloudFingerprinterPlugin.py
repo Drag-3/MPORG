@@ -101,6 +101,7 @@ class ACRCloudCredentialProvider(CredentialProvider):
         "access_secret": lambda x: len(x) > 0,  # access_secret must not be empty
     }
     PNAME = "ACRCloud"
+    CONFIG_NAME = "acoustid.json"
 
     def get_credentials(self):
         # Try to get and verify credentials
