@@ -81,7 +81,10 @@ def install_plugin_dependencies(plugin: PluginInfo):
     """
     logging.info(f"Installing dependencies for {plugin.name}")
     for package in plugin.dependancies:
-        subprocess.run(["pip", "install", package])
+        ret = subprocess.run(["pip", "install", package]).returncode
+        if ret != 0:
+            logging.error(f"Error installing {package}")
+            raise Exception(f"Error installing {package} dependency")
         logging.debug(f"Installed {package}")
 
 
@@ -116,22 +119,28 @@ def install_plugin(source: str):
     :return bool:  True if the plugin was installed successfully, False if the plugin was not installed
     """
     plugin = get_plugin_info(source)
-    logging.info(f"Installing plugin: {plugin.name}")
-    if plugin.readme:
-        display_markdown(plugin.dir / "README.md")
-        rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue, or any other key to cancel")
-        user_quit = input()
-        if user_quit:
-            # Installation is Aborted!
-            logging.info(f"Install of {plugin.name} aborted")
-            rich.print("[bold red]ABORTED[/bold red]")
-            delete_plugin(plugin.dir)
-            return False
+    try:
+        logging.info(f"Installing plugin: {plugin.name}")
+        if plugin.readme:
+            display_markdown(plugin.dir / "README.md")
+            rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue, or any other key to cancel")
+            user_quit = input()
+            if user_quit:
+                # Installation is Aborted!
+                logging.info(f"Install of {plugin.name} aborted")
+                rich.print("[bold red]ABORTED[/bold red]")
+                delete_plugin(plugin.dir)
+                return False
 
-    install_plugin_dependencies(plugin)
-    install_plugin_modules(plugin)
-    logging.info(f"Plugin {plugin.name} installed successfully.")
-    return True
+        install_plugin_dependencies(plugin)
+        install_plugin_modules(plugin)
+        logging.info(f"Plugin {plugin.name} installed successfully.")
+        return True
+    except Exception as e:
+        logging.exception(f"Error installing plugin: {e}")
+        logging.info(f"Deleting plugin {plugin.name}")
+        delete_plugin(plugin.dir)
+        return False
 
 
 def delete_plugin(plugin_dir: Path):
