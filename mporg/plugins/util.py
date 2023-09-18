@@ -125,6 +125,7 @@ def install_plugin(source: str):
             # Installation is Aborted!
             logging.info(f"Install of {plugin.name} aborted")
             rich.print("[bold red]ABORTED[/bold red]")
+            delete_plugin(plugin.dir)
             return False
 
     install_plugin_dependencies(plugin)
@@ -183,13 +184,22 @@ def check_default_plugins():
             logging.info(f"Plugin {plugin_name} does not exist.")
             # If the directory does not exist, install the plugin
             install_plugin(url)
-        else:
-            # If the directory exists, check if the plugin.json file exists
-            plugin_json_file = plugin_dir / "plugin.json"
-            if not plugin_json_file.exists():
-                logging.info(f"Plugin {plugin_name} exists but is missing plugin.json file.")
-                # If the plugin.json file does not exist, install the plugin
-                install_plugin(url)
+            return
+
+        # If the directory exists, check if the plugin.json file exists
+        plugin_json_file = plugin_dir / "plugin.json"
+        if not plugin_json_file.exists():
+            logging.info(f"Plugin {plugin_name} exists but is missing plugin.json file.")
+            # If the plugin.json file does not exist, install the plugin
+            install_plugin(url)
+            return
+
+        plugin_pattern = "*Plugin.py"
+        # If the plugin.json file exists, check if the main entrypoint module exists
+        if not any(plugin_dir.glob(plugin_pattern)):
+            logging.info(f"Plugin {plugin_name} exists but is missing main entrypoint module.")
+            # If the main entrypoint module does not exist, install the plugin
+            install_plugin(url)
 
 
 def setup_and_check_plugins():
