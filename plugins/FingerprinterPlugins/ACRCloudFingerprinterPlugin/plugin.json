@@ -2,7 +2,7 @@
   "name": "ACRCloudFingerprinter",
   "type": "FingerprinterPlugin",
   "readme": "https://raw.githubusercontent.com/Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/ACRCloudFingerprinterPlugin/README.md",
-  "dependencies": ["pyacrcloud @ https://github.com/acrcloud/acrcloud_sdk_python.git ; sys_platform == 'win32'", "pyacrcloud; sys_platform == 'linux'", "diskcache", "ftfy"],
+  "dependencies": ["pyacrcloud @ git+https://github.com/acrcloud/acrcloud_sdk_python.git ; sys_platform == 'win32'", "pyacrcloud; sys_platform == 'linux'", "diskcache", "ftfy"],
 
   "modules": [
     {
