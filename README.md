@@ -24,34 +24,10 @@ The project aims to organize music files. It uses mutagen to get stored metadata
 
 
 To install this project for normal use:
-
-1. **WINDOWS ONLY**: Download and install Visual Studio 2010 (VC++ 10.0) SP1 from [this link](https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170#visual-studio-2010-vc-100-sp1-no-longer-supported). This is a mandatory step as the project relies on it to function correctly on Windows.
-   ![img_1.png](img_1.png)
-
-2. Install the project using pip:
+- Install the project using pip:
    ```bash
    pip install git+https://github.com/Drag-3/MPORG.git
    ```
-
-3. Install External Dependencies:
-   - On Linux:
-     - Install chromaprint using your distribution's package manager. For example:
-       ```bash
-       apt install ffmpeg libchromaprint-dev libchromaprint-tools
-       ```
-       ```bash
-        pacman -S ffmpeg chromaprint
-       ```
-       ```bash
-          zypper install ffmpeg chromaprint-fpcalc
-       ```
-     - If you choose to install chromaprint from the acoustid [Website](https://acoustid.org/chromaprint), ensure that you add fpcalc to your PATH. This is required for the program to detect and use fpcalc properly.
-   - On Windows:
-     - If you haven't already, install chromaprint from the acoustid [Website](https://acoustid.org/chromaprint).
-     *Note: If you have winget installed, you can install ffmpeg using the following command:
-     ```bash
-      winget install Gyan.FFmpeg
-     ```
 
 ### Dev Installation
 
@@ -67,13 +43,7 @@ To install the project for editing or modification:
    cd mporg
    ```
 
-3. **WINDOWS DEVICES ONLY**: Before using the requirements file, ensure that you have Visual Studio 2010 (VC++ 10.0) SP1 installed. If you haven't installed it yet, you can download it from [Microsoft](https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170#visual-studio-2010-vc-100-sp1-no-longer-supported). This step is necessary for ACRCloud to work correctly.
-
-   ![img.png](img_1.png)
-
-4. Install chromaprint and its dependencies, following the instructions mentioned in the "Normal Installation" section.
-
-5. Install the required dependencies:
+3. Install the required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
@@ -156,6 +126,7 @@ The `plugin.json` file is used to describe your plugin. It contains the followin
 - `type`: The type of plugin. Currently, only `FingerprinterPlugin` is supported.
 - `dependencies`: A list of dependencies required for your plugin to function. This is a list of strings. And it can include git URLs, PyPI package names, and local file paths.
 - `modules`: A list of modules to import. This is a list of dicts. One of these must be the entry point for your plugin. Each dict must contain a `name` field and an `url` field. The `name` field is the desired filename of the module. The `url` field is the URL to the module. This will be a direct url to the file. For example, if you are hosting your plugin on GitHub, the URL will be in the format `https://raw.githubusercontent.com/<username>/<repo>/<branch>/<path/to/file>`. The `name` field will be the filename of the file at the end of the URL. For example, if the URL is `https://raw.githubusercontent.com/Drag-3/MPORG/main/mporg/plugins/acrcloud/ACRCloudPlugin.py`, the `name` field will be `ACRCloudPlugin.py`.
+- `readme`: An optional URL to a README file for your plugin. This will be displayed to the user when they install your plugin.
 
 ##### Example
 ```json
@@ -163,6 +134,7 @@ The `plugin.json` file is used to describe your plugin. It contains the followin
     "name": "MyFingerprintPlugin",
     "type": "FingerprinterPlugin",
     "dependencies": ["dependency1", "dependency2"],
+    "readme": "https://github.com/user/my-fingerprint-plugin/raw/main/README.md",
     "modules": [
         {
             "name": "MyFingerprintPlugin.py",
@@ -196,7 +168,7 @@ Plugin repos are simply git repositories that contain plugins. They must contain
 ### Using Plugins
 To use a plugin, you must first install it. This can be done by running the following command:
 ```bash
-mporg --install-plugins [plugin1] [plugin2] ...
+mporg --install-plugins [plugin1 url] [plugin2 url] ...
 ```
 This will install the specified plugins. The plugins will be installed in the `$HOME/.mporg/plugins` directory. This directory will be created if it does not exist.
 Currently only fingerprinter plugins are supported. To use a fingerprinter plugin, you must specify it in the command line options. This can be done by using the `-f` or `--fingerprint` option. For example:

@@ -7,7 +7,6 @@ from pathlib import Path
 import rich
 
 from mporg import VERSION, CONFIG_DIR
-from mporg.audio_fingerprinter import get_fingerprinter
 from mporg.credentials.credentials_manager import CredentialManager
 from mporg.logging_utils.logging_setup import setup_logging
 from mporg.organizer import MPORG
@@ -121,9 +120,13 @@ def main():
 
     spotify_searcher = SpotifySearcher(spotify_creds["cid"], spotify_creds["secret"])
 
-    fingerprinters = [
-        get_fingerprinter(x[0], x[1]) for x in credentials.items() if x[1] is not None
-    ]
+    # Add credentials to loaded plugins, then add list of fingerprinters to MPORG
+    fingerprinters = []
+    for plugin in loader.fingerprinters.values():
+        if plugin.provider is not None:
+            fingerprinters.append(plugin.plugin(credentials[plugin.provider.PNAME]))
+        else:
+            fingerprinters.append(plugin.plugin())
 
     logging.info("All good, starting Organizing")
     org = MPORG(

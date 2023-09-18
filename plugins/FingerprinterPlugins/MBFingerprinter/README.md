@@ -2,14 +2,14 @@
 ## Description  
 This plugin serves as a FingerprinterPlugin that uses the Chromaprint Library, the Acoustid Service, and the MusicBrainz Service in order to fingerprint and gather metadata on unknown music files.
 
-*Install-Instructions*  
+## Install-Instructions
 
-This plugin requires some non python dependancies. The Chromaprint Library along with fpcalc and ffmpeg must be installed on the users system. Specific Instructions are below.
+This plugin requires some non python dependencies. The [Chromaprint Library](https://acoustid.org/chromaprint) along with fpcalc and [ffmpeg](https://ffmpeg.org/) must be installed on the users system. Specific Instructions are below.
 
 To install the non python dependencies:
 - Install FFmpeg:
     - On Linux:
-        - Install ffmpeg using your distibution's package manager.
+        - Install ffmpeg using your distribution's package manager.
         ```bash
             apt install ffmpeg
         ```
@@ -39,24 +39,10 @@ To install the non python dependencies:
    - On Windows:
        - If you haven't already, install chromaprint from the acoustid [Website](https://acoustid.org/chromaprint).
 
-```
-Thoughts
-If I can provide plugin READMEs as md files or txt files, How can I render md files upon download?
-Need to research some packages that can do that if possible.
-Also how would I render it? The terminal may not be feasible, but this is a terminal application...
-Packages to render markdown in terminal ? Would have to be cross platform hopefully... or I would have to change imports and deps based on device type
-Reseach ig ----> Will use rich. I've already used it in earlier applications and it seems to work well enough cross platform.
 
+## Credentials Required
+This plugin requires an AcoustID API Key. To acquire an AcoustID API key, register your application at the [AcoustID](https://acoustid.org/new-application) site. The AcoustID and MusicBrainz APIs are free to use.  
+When running this plugin for the first time you will be prompted to enter your API Key. This will be stored in the config file and will not be prompted for it again.
 
-Link to README will be included in plugin.json as "README: https://example.com"
-
-Once that is complete add a command to display a plugin readme for an installed plugin, or for non installed plgins
-For an installed plugin it will find and render the readme.
-For an non installed plugin it will download plugin.json to temp storage, then download the readme to temp storage, then render the readme.
-To preserve ram have a directory tree in temp storage...
-
-Now while installing a plugin I want the readme to be displayed, Specifically to show the user any non python depenancies required and how to install them
-The user will read and then press a button and installation will continue.
-
-Having all of this sould make it easier for plugins to 'just work' as they do with plugins with no non-python dependancies.
-```
+## Credits
+This plugin was written by Drag-3.

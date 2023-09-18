@@ -192,6 +192,10 @@ def display_markdown(md_file: Path):
         console = rich.get_console()
         console.print(Markdown(file.read()))
 
+# TODO: Provide a way to diplay an plugin's Version, and automatically check for updates
+# When installing a plugin, it will check if the plugin is already installed, and if so, check if the version is the same.
+# If the version is the same it will ask if you want to reinstall the plugin, if the version is different it will ask if you want to update the plugin.
+
 
 if __name__ == "__main__":
     display_markdown("/home/justin/PycharmProjects/MP3ORG/plugins/FingerprinterPlugins/MBFingerprinter/README.md")
