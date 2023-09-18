@@ -162,7 +162,7 @@ class AcoustIDCredentialProvider(CredentialProvider):
         while not credentials or not self.verify_spec(credentials) or not self.verify_credentials(credentials):
             api_key = input("Enter your AcoustID API Key: ")
             if api_key.lower() == "q":
-                return None
+                return {}
             credentials = {"api": api_key}
 
         self.store_credentials(credentials)
