@@ -14,20 +14,15 @@ from threading import Lock
 
 import mutagen
 from lyrics_searcher.api import search_lyrics_by_file
-from mutagen.asf import ASF, ASFUnicodeAttribute
-from mutagen.easyid3 import EasyID3
-from mutagen.easymp4 import EasyMP4
-from mutagen.flac import FLAC
-from mutagen.id3 import ID3NoHeaderError
-from mutagen.wave import WAVE
 from tqdm import tqdm
 
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
-from mporg.spotify_searcher import SpotifySearcher, Track
+from mporg.spotify_searcher import SpotifySearcher
+from mporg.types import Track, Tagger
 
 INVALID_PATH_CHARS = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ".", "\x00"]
 SUPPORTED_FILETYPES = [".mp3", ".wav", ".flac", ".ogg", ".wma", ".m4a", ".oga"]
-logging.getLogger('__main__.' + __name__)
+logging.getLogger("__main__." + __name__)
 logging.propagate = True
 
 
@@ -52,7 +47,6 @@ def wait_if_locked(timeout):
 
     def decorator(func):
         def wrapper(*args, **kwargs):
-
             locks = set(arg for arg in args if isinstance(arg, type(Lock())))
 
             func_args = tuple(arg for arg in args if arg not in locks)
@@ -70,95 +64,6 @@ def wait_if_locked(timeout):
         return wrapper
 
     return decorator
-
-
-def register_comment(lang='\0\0\0', desc=''):
-    """Register the comment tag"""
-    frame_id = ':'.join(('COMM', desc, lang))
-
-    def getter(id3, _key):
-        frame = id3.get(frame_id)
-        return None if frame is None else list(frame)
-
-    def setter(id3, _key, value):
-        id3.add(mutagen.id3.COMM(
-            encoding=3, lang=lang, desc=desc, text=value))
-
-    def deleter(id3, _key):
-        del id3[frame_id]
-
-    EasyID3.RegisterKey('comment', getter, setter, deleter)
-
-
-class Tagger:
-    """
-    Wrapper class for mutagen objects, to provide consistent api for any filetype
-    Take care to only use valid tags for each type
-    """
-
-    def __init__(self, file: Path):
-        # Register Non-Standard Keys for Easy
-        register_comment()
-        EasyID3.RegisterTextKey("initialkey", "TKEY")
-        EasyID3.RegisterTextKey("source", "WOAS")
-        EasyMP4.RegisterTextKey("source", "source")
-        EasyMP4.RegisterTextKey("initialkey", "----:com.apple.iTunes:initialkey")
-
-        # Determine mutagen object to use
-        self.extension = file.suffix
-        if self.extension.lower() == ".mp3":
-            try:
-                self.tagger = EasyID3(file)
-            except ID3NoHeaderError:
-                self.tagger = mutagen.File(file, easy=True)
-                self.tagger.add_tags()
-
-        elif self.extension.lower() == ".m4a":
-            self.tagger = EasyMP4(file)
-        elif self.extension.lower() == ".wav":
-            self.tagger = WAVE(file)
-        elif self.extension.lower() in [".wma"]:
-            self.tagger = ASF(file)
-        elif self.extension.lower() == ".flac":
-            self.tagger = FLAC(file)
-        elif self.extension.lower() in [".ogg", ".oga"]:
-            self.tagger = mutagen.File(file)  # Cannot tell if Opus Vorbis or other based on extension alone.
-        else:
-            logging.warning(f"{file} has invalid extension {self.extension}")
-            raise ValueError("Invalid Extension")
-
-    def get(self, key, value=None):
-        result = self.tagger.get(key, value)
-        if self.extension.lower() == ".wma":
-            if isinstance(result, list):
-                # Convert each item in the list to string as ASF/WMA uses special Values
-                result = [str(item) for item in result]
-            elif isinstance(result, ASFUnicodeAttribute):
-                # If it's an ASFUnicodeAttribute, extract the string value
-                result = str(result)
-
-        return result
-
-    def __getitem__(self, item):
-        result = self.tagger.__getitem__(item)
-        if self.extension.lower() == ".wma":
-            if isinstance(result, list):
-                # Convert each item in the list to string as ASF/WMA uses special Values
-                result = [str(item) for item in result]
-            elif isinstance(result, ASFUnicodeAttribute):
-                # If it's an ASFUnicodeAttribute, extract the string value
-                result = str(result)
-
-        return result
-
-    def __setitem__(self, key, value):
-        self.tagger.__setitem__(key, value)
-
-    def add_tags(self):
-        self.tagger.add_tags()
-
-    def save(self):
-        self.tagger.save()
 
 
 class TagType(enum.Enum):
@@ -222,9 +127,18 @@ def save_metadata(tagger: Tagger):
 
 
 class MPORG:
-
-    def __init__(self, store: Path, search: Path, searcher: SpotifySearcher, fingerprinters: list[Fingerprinter],
-                 pattern: list, lyrics: bool):
+    """
+    Main class for organizing files
+    """
+    def __init__(
+        self,
+        store: Path,
+        search: Path,
+        searcher: SpotifySearcher,
+        fingerprinters: list[Fingerprinter],
+        pattern: list,
+        lyrics: bool,
+    ):
         self.search = search
         self.store = store
         self.sh = searcher
@@ -236,6 +150,11 @@ class MPORG:
         self.lyric_semaphore = threading.Semaphore(5)
 
     def process_file(self, args):
+        """
+        Process a single file
+        :param args:  Tuple of root and file
+        :return str:  Error Messages
+        """
         root, file = args
         try:
             logging.info(f"Organizing: {str(root / file)}")
@@ -274,7 +193,11 @@ class MPORG:
             return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
-        logging.top('Organizing files...')
+        """
+        Organize all files in the search directory
+        :return:
+        """
+        logging.top("Organizing files...")
         file_count = get_file_count(self.search)
 
         with tqdm(desc="Organizing", total=file_count, unit="file", miniters=0) as pbar:
@@ -284,8 +207,10 @@ class MPORG:
                     logging.info(f"{str(file)} has unsupported type")
                     pbar.update(1)
                     continue
-                if not self.pattern or self.pattern and any(item in file.suffix for item in self.pattern):  # Check
-                    # pattern
+                if (
+                    not self.pattern or self.pattern
+                    and any(item in file.suffix for item in self.pattern)
+                ):  # Check pattern
                     future = self.executor.submit(self.process_file, (root, file))
                     future.add_done_callback(lambda f: pool_callback(f.result(), pbar))
                     futures.append(future)
@@ -294,7 +219,7 @@ class MPORG:
                     pbar.update(1)
             wait(futures)
 
-        logging.top('Organizing files finished.')
+        logging.top("Organizing files finished.")
 
     def get_metadata(self, metadata: Tagger, file: Path):
         """
@@ -303,17 +228,17 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        comment = metadata.get('comment')
-        source = metadata.get('source')
-        url = metadata.get('url')
+        comment = metadata.get("comment")
+        source = metadata.get("source")
+        url = metadata.get("url")
 
         if spot_id := get_valid_spotify_url((comment, source, url)):
             logging.info(f"A spotify Url was found in {file} metadata. Searching via id")
             spotify_results = self.get_fingerprint_spotify_metadata(spot_id)
             return spotify_results, TagType.SPOTIFY
-        artist = ["".join(u.replace('\x00', '').split('/')) for u in
-                  metadata.get('artist', '')]  # Replace Null Bytes
-        title = [u.replace('\x00', '') for u in metadata.get('title', '')]
+        artist = ["".join(u.replace("\x00", "").split("/"))
+            for u in metadata.get("artist", "")]  # Replace Null Bytes
+        title = [u.replace("\x00", "") for u in metadata.get("title", "")]
         if len(artist) == 1:
             artist = "".join(artist)
         if len(title) == 1:
@@ -330,15 +255,20 @@ class MPORG:
             if fingerprint_results:
                 if fingerprint_results.type == "spotify":
                     spotify_results = self.get_fingerprint_spotify_metadata(
-                        fingerprint_results.results.get("spotifyid"))
+                        fingerprint_results.results.get("spotifyid")
+                    )
                     if spotify_results:
-                        logging.info(f"Metadata found using audio fingerprinting and Spotify for ID:"
-                                     f" {fingerprint_results.results.get('spotifyid')}")
+                        logging.info(
+                            f"Metadata found using audio fingerprinting and Spotify for ID:"
+                            f" {fingerprint_results.results.get('spotifyid')}"
+                        )
                         logging.debug(spotify_results)
                         return spotify_results, TagType.SPOTIFY
                 else:
-                    logging.info(f"Metadata found using audio fingerprinting: {fingerprint_results.results.track_name}"
-                                 f" by {fingerprint_results.results.track_artists}")
+                    logging.info(
+                        f"Metadata found using audio fingerprinting: {fingerprint_results.results.track_name}"
+                        f" by {fingerprint_results.results.track_artists}"
+                    )
                     logging.debug(fingerprint_results.results)
                     return fingerprint_results.results, TagType.FINGERPRINTER
         else:
@@ -367,7 +297,9 @@ class MPORG:
             return results
         return None
 
-    def get_location(self, results: Track, tags_from: TagType, metadata: Tagger, file: Path) -> Path:
+    def get_location(
+        self, results: Track, tags_from: TagType, metadata: Tagger, file: Path
+    ) -> Path:
         """
         Determine the correct location to move the file based on metadata results and source
         :param Path file: Path for original file
@@ -385,41 +317,64 @@ class MPORG:
             return self.metadata_location(metadata, ext, file)
 
     def spotify_location(self, results: Track, ext: str) -> Path:
-        album_artist, album_name, track_artist, track_name = _sanitize_results(self.store, results)
+        album_artist, album_name, track_artist, track_name = _sanitize_results(
+            self.store, results
+        )
 
-        return self.store / album_artist / \
-            f"{results.album_year} - {album_name.strip()}" / \
-            f"{results.track_number}. - {track_artist} - {track_name}{ext}"
+        return (
+            self.store
+            / album_artist
+            / f"{results.album_year} - {album_name.strip()}"
+            / f"{results.track_number}. - {track_artist} - {track_name}{ext}"
+        )
 
     def fingerprinter_location(self, results: Track, ext: str) -> Path:
-        album_artist, album_name, track_artist, track_name = _sanitize_results(self.store, results)
+        album_artist, album_name, track_artist, track_name = _sanitize_results(
+            self.store, results
+        )
 
-        return self.store / album_artist / \
-            (f"{results.track_year} - " + f"{album_name}" if results.track_year else f"{album_name}") / \
-            f"{track_artist} - {track_name}{ext}"
+        return (
+            self.store
+            / album_artist
+            / (
+                f"{results.track_year} - " + f"{album_name}"
+                if results.track_year
+                else f"{album_name}"
+            )
+            / f"{track_artist} - {track_name}{ext}"
+        )
 
-    def metadata_location(self, metadata: Tagger, file_extension: str, file: Path) -> Path:
+    def metadata_location(
+        self, metadata: Tagger, file_extension: str, file: Path
+    ) -> Path:
         title = metadata.get("title")
         artist = metadata.get("artist")
         album = metadata.get("album")
 
         if not all((title, artist, album)):
-            logging.warning(f"Cannot find enough metadata to organize '{str(file)}' ...")
+            logging.warning(
+                f"Cannot find enough metadata to organize '{str(file)}' ..."
+            )
             return self.store / "_TaggingImpossible" / file
 
         track_artist = ", ".join(artist).strip()
-        year = "".join(metadata.get('date', "")).strip()
-        album = "".join(metadata.get('album', "")).strip()
-        track = "".join(metadata.get('title', "")).strip()
-        track_num = "".join(metadata.get('tracknumber', ["1"]))
-        artist = [a.replace("/", ", ").strip() for a in metadata.get('artist', [])]
+        year = "".join(metadata.get("date", "")).strip()
+        album = "".join(metadata.get("album", "")).strip()
+        track = "".join(metadata.get("title", "")).strip()
+        track_num = "".join(metadata.get("tracknumber", ["1"]))
+        artist = [a.replace("/", ", ").strip() for a in metadata.get("artist", [])]
         # MP4 files get artists as '/' separated strings, split them apart here
         # If the artist name actually has '/', sorry
 
-        if title and artist and metadata.get('album') and not metadata.get('albumartist'):
+        if (
+            title
+            and artist
+            and metadata.get("album")
+            and not metadata.get("albumartist")
+        ):
             album_artist = ", ".join(artist).strip()  # Use artist instead
         else:
-            album_artist = ", ".join(metadata.get('albumartist', [])).strip()
+            album_artist = ", ".join(metadata.get("albumartist", [])).strip()
 
         # Build path using pathlib
         path = self.store / _remove_invalid_path_chars(album_artist)
@@ -434,8 +389,12 @@ class MPORG:
         parts = []
         # Build filename
         if track_num:
-            if isinstance(track_num, str):  # Prob in form num / total so remove the /total
-                parts.append(f"{int(_remove_invalid_path_chars(track_num.split('/')[0]))}.")
+            if isinstance(
+                track_num, str
+            ):  # Prob in form num / total so remove the /total
+                parts.append(
+                    f"{int(_remove_invalid_path_chars(track_num.split('/')[0]))}."
+                )
             else:
                 parts.append(f"{track_num}.")
         if track_artist and track_artist != "Unknown":
@@ -492,29 +451,31 @@ class MPORG:
         except Exception as e:
             logging.exception(f"Error getting metadata for update {e} ")
             raise e
-        metadata['title'] = results.track_name
-        metadata['artist'] = ";".join(results.track_artists)
-        metadata['album'] = results.album_name
-        metadata['date'] = results.album_year
-        metadata['tracknumber'] = str(results.track_number)
-        metadata['discnumber'] = str(results.track_disk)
-        metadata['comment'] = results.track_url
-        metadata['source'] = results.track_url
-        metadata['albumartist'] = ";".join(results.album_artists)
+        metadata["title"] = results.track_name
+        metadata["artist"] = ";".join(results.track_artists)
+        metadata["album"] = results.album_name
+        metadata["date"] = results.album_year
+        metadata["tracknumber"] = str(results.track_number)
+        metadata["discnumber"] = str(results.track_disk)
+        metadata["comment"] = results.track_url
+        metadata["source"] = results.track_url
+        metadata["albumartist"] = ";".join(results.album_artists)
         try:
-            metadata['bpm'] = str(int(results.track_bpm))
+            metadata["bpm"] = str(int(results.track_bpm))
         except TypeError:
             pass
         try:
-            metadata['initialkey'] = results.track_key
+            metadata["initialkey"] = results.track_key
         except TypeError:
             pass
-        metadata['genre'] = results.album_genres
+        metadata["genre"] = results.album_genres
 
         save_metadata(metadata)
 
     @wait_if_locked(10)
-    def update_metadata_from_fingerprinter(self, location: Path, results: Track) -> None:
+    def update_metadata_from_fingerprinter(
+        self, location: Path, results: Track
+    ) -> None:
         """
         Update file metadata with the fingerprinter's results
         :param Path location: location of file to update
@@ -527,19 +488,19 @@ class MPORG:
         except Exception as e:
             logging.exception(f"Error getting metadata for update {e} ")
             raise e
-        metadata['title'] = results.track_name
-        metadata['artist'] = ";".join(results.track_artists)
-        metadata['albumartist'] = ";".join(results.album_artists)
+        metadata["title"] = results.track_name
+        metadata["artist"] = ";".join(results.track_artists)
+        metadata["albumartist"] = ";".join(results.album_artists)
         try:
-            metadata['album'] = results.album_name
+            metadata["album"] = results.album_name
         except ValueError:
             pass
         try:
-            metadata['date'] = results.track_year
+            metadata["date"] = results.track_year
         except ValueError:
             pass
         try:
-            metadata['genre'] = results.album_genres
+            metadata["genre"] = results.album_genres
         except ValueError:
             pass
 
@@ -579,19 +540,23 @@ class MPORG:
         logging.info(f"Lyrics found for {location}. Type {t}.")
         lyric_file = location.parent
         filename = location.stem
-        destination = lyric_file / (filename + '.' + t)
+        destination = lyric_file / (filename + "." + t)
 
         destination_lock = self.get_lock(destination)
 
-        if (lyric_file / (filename + ".txt")).exists() or (lyric_file / (filename + ".lrc")).exists():
+        if (lyric_file / (filename + ".txt")).exists() or (
+            lyric_file / (filename + ".lrc")
+        ).exists():
             txt = lyric_file / (filename + ".txt")
             lrc = lyric_file / (filename + ".lrc")
             existing = (txt, lrc)
 
             for file in existing:
                 if file.exists():
-                    logging.info(f"A lyrics file already exists for {location}, check if current.")
-                    with open(file, 'r', encoding='utf-8') as f:
+                    logging.info(
+                        f"A lyrics file already exists for {location}, check if current."
+                    )
+                    with open(file, "r", encoding="utf-8") as f:
                         if not lyrics == f.read():
                             logging.info(f"Deleting {file}")
                             try:
@@ -607,7 +572,7 @@ class MPORG:
             try:
                 logging.info(f"Writing Lyrics file: {destination}")
                 with acquire(destination_lock, timeout=30):
-                    with open(destination, 'w', encoding="utf-8") as f:
+                    with open(destination, "w", encoding="utf-8") as f:
                         f.write(lyrics)
 
                 return  # File operations completed successfully, exit the function
@@ -621,12 +586,12 @@ class MPORG:
         logging.error(f"Failed to acquire destination lock for {destination}")
 
         # Retry limit reached for location lock, file operations failed
-        #logging.error(f"Failed to acquire location lock for {location}")
+        # logging.error(f"Failed to acquire location lock for {location}")
 
 
 def _remove_invalid_path_chars(s: str) -> str:
     """Helper function to remove invalid characters from a string."""
-    return ''.join(c for c in s if c not in INVALID_PATH_CHARS)
+    return "".join(c for c in s if c not in INVALID_PATH_CHARS)
 
 
 def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
@@ -642,9 +607,10 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     # Get Path max and File max
 
     if sys.platform == "linux":  # Use Linux stuff:
-        path_max = os.pathconf('/', "PC_PATH_MAX")
+        path_max = os.pathconf("/", "PC_PATH_MAX")
     else:  # Assume Windows as it has a lower path max
         from ctypes.wintypes import MAX_PATH
+
         path_max = MAX_PATH
 
     path_max -= 5  # Buffer for ceil function
@@ -676,7 +642,9 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
     track_name = _remove_invalid_path_chars(results.track_name)[:name_max].strip()
 
     # Calculate the total length of the sanitized results
-    total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
+    total_length = (
+        len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
+    )
 
     # If the total length exceeds path_max, truncate the longest string(s)
     if total_length > path_max:
@@ -685,7 +653,12 @@ def _sanitize_results(root: Path, results: Track) -> (str, str, str, str):
                 album_name = album_name[:-1].strip()
             else:
                 track_name = track_name[:-1].strip()
-            total_length = len(album_artist) + len(track_artist) + len(album_name) + len(track_name)
+            total_length = (
+                len(album_artist)
+                + len(track_artist)
+                + len(album_name)
+                + len(track_name)
+            )
 
     return album_artist, album_name, track_artist, track_name
 
@@ -696,7 +669,7 @@ def get_valid_spotify_url(strings):
     for string in strings:
         if string and spotify_track_url in "".join(string):
             track_id = "".join(string).replace(spotify_track_url, "")
-            track_id = track_id.split('?')[0]  # Remove any trailing params
+            track_id = track_id.split("?")[0]  # Remove any trailing params
             return track_id
 
     return None
