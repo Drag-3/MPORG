@@ -109,12 +109,18 @@ def install_plugin(source: str):
     logging.info(f"Installing plugin: {plugin.name}")
     if plugin.readme:
         display_markdown(plugin.dir / "README.md")
-        rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue")
-        input()
+        rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue, or any other key to cancel")
+        user_quit = input()
+        if user_quit:
+            # Installation is Aborted!
+            logging.info(f"Install of {plugin.name} aborted")
+            rich.print("[bold red]ABORTED[/bold red]")
+            return False
 
     install_plugin_dependencies(plugin)
     install_plugin_modules(plugin)
     logging.info(f"Plugin {plugin.name} installed successfully.")
+    return True
 
 
 def delete_plugin(plugin_dir: Path):

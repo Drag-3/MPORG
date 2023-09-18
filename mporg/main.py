@@ -4,6 +4,8 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
+import rich
+
 from mporg import VERSION, CONFIG_DIR
 from mporg.audio_fingerprinter import get_fingerprinter
 from mporg.credentials.credentials_manager import CredentialManager
@@ -88,9 +90,11 @@ def main():
         sys.exit(0)
 
     if args.install_plugins:
+        installed = 0
         for plugin_url in args.install_plugins:
-            install_plugin(plugin_url)
-        print(f"{len(args.install_plugins)} Plugins installed, exiting")
+            if install_plugin(plugin_url):
+                installed += 1
+        rich.print(f"{installed} Plugin{'' if installed == 1 else 's'} installed, exiting")
         sys.exit(0)
 
     setup_and_check_plugins()
@@ -101,7 +105,9 @@ def main():
         to_load = args.fingerprint
         try:
             loader.load_plugin(PluginType.FINGERPRINTER, to_load)
-        except Exception as e:  # Catch any uncaught exceptions loading Plugins Log and ignore
+        except (
+            Exception
+        ) as e:  # Catch any uncaught exceptions loading Plugins Log and ignore
             logging.error(f"Error loading plugin. {e}")
 
     cred_manager = CredentialManager()
