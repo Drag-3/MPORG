@@ -1,8 +1,7 @@
 from concurrent.futures import Future, ThreadPoolExecutor
-from unittest.mock import MagicMock
 
 import mporg.types
-from mporg import organizer, spotify_searcher, audio_fingerprinter
+from mporg import audio_fingerprinter
 
 
 class MockTagger(mporg.types.Tagger):
