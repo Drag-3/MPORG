@@ -7,6 +7,7 @@ requests~=2.31.0
 urllib3~=2.0.4
 LyricsSearcher @ git+https://github.com/Drag-3/LyricsSearcher.git
 tqdm~=4.66.1
+rich~=13.5.3
 # Linux requirements
 pyacrcloud~=1.0.1; sys_platform == 'linux'
 
@@ -17,3 +18,5 @@ pyacrcloud @ https://github.com/acrcloud/acrcloud_sdk_python.git ; sys_platform 
 parameterized~=0.9.0
 setuptools>=68.2.2
 unittest-xml-reporting~=3.2.0
+
+
