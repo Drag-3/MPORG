@@ -41,8 +41,8 @@ To install the non python dependencies:
 
 
 ## Credentials Required
-This plugin requires an AcoustID API Key. To acquire an AcoustID API key, register your application at the [AcoustID](https://acoustid.org/new-application) site. The AcoustID and MusicBrainz APIs are free to use.  
-When running this plugin for the first time you will be prompted to enter your API Key. This will be stored in the config file and will not be prompted for it again.
+This plugin requires an AcoustID API Key. To acquire an AcoustID API key, register your application at the [AcoustID](https://acoustid.org/new-application) site. The AcoustID and MusicBrainz APIs are free to use.   
+**NOTE**: When running this plugin for the first time you will be prompted to enter your API Key. This will be stored in the config file and will not be prompted for it again.
 
 ## Credits
 This plugin was written by Drag-3.
