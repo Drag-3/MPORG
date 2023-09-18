@@ -34,7 +34,9 @@ def main():
     arg_parser.add_argument(
         "-f",
         "--fingerprint",
-        help="Use specifified Fingerprinter",
+        help="Use specifified Fingerprinters, space separated",
+        default=[],
+        nargs="+",
         metavar="Fingerprinter Name",
     )
     arg_parser.add_argument(
@@ -49,7 +51,7 @@ def main():
         "--pattern_extension",
         help="Extension(s) to copy over, space separated",
         default=[],
-        nargs="*",
+        nargs="+",
         metavar="EXT",
     )
     arg_parser.add_argument(
@@ -101,13 +103,13 @@ def main():
     if args.all_fingerprint:
         loader.load_all_fingerprinters()
     else:
-        to_load = args.fingerprint
-        try:
-            loader.load_plugin(PluginType.FINGERPRINTER, to_load)
-        except (
-            Exception
-        ) as e:  # Catch any uncaught exceptions loading Plugins Log and ignore
-            logging.error(f"Error loading plugin. {e}")
+        for to_load in args.fingerprint:
+            try:
+                loader.load_plugin(PluginType.FINGERPRINTER, to_load)
+            except (
+                Exception
+            ) as e:  # Catch any uncaught exceptions loading Plugins Log and ignore
+                logging.error(f"Error loading plugin. {e}")
 
     cred_manager = CredentialManager()
     for plugin in loader.fingerprinters.values():

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2a1] - 2023-09-20
+### Added
+- Plugins: Users can now add their own fingerprinters. This allows them to use their own API keys and services. See the [README](README.md) for more information.
+- Added `--install-plugin` option: Users can now install plugins from the command line by entering the url of the plugin.
+
+### Changed
+- Moved AcoustID and MusicBrainz to a default plugin.
+- `-f` `--fingerprinter` option now takes a list of plugins names. Instead of using all fingerprinters. That is now done with `-af` `--all-fingerprinters`.
+- Removed `-a` and `-m` options. With the addition of plugins, these options are no longer needed, as fingerprinters can be added and removed as needed and then called with `-f` or `-af`.
+
+### Fixed
+- Fixed pyproject.toml to include all dependencies in the requirements.txt file. Previously it had a hardcoded out of date list of dependencies causing pip install to fail.
+
 ## [0.1a3] - 2023-07-28
 After every update I recommend deleting the caches in order to make sure you use the live version.
 ### Added

@@ -45,6 +45,9 @@ locks = {}
 
 
 class SpotifySearcher:
+    """
+    Class for searching Spotify for tracks
+    """
     def __init__(self, cid: str, secret: str):
         self.cid = cid
         self.secret = secret
@@ -75,6 +78,10 @@ class SpotifySearcher:
         }
 
     def load_auth(self):
+        """
+        Load the auth cache from disk
+        :return:
+        """
         try:
             with self.auth_path_lock, open(self.auth_path, 'r', encoding='utf-8') as f:
                 info = json.load(f)
@@ -116,6 +123,10 @@ class SpotifySearcher:
         return secs < 45
 
     def validate_token(self):
+        """
+        Validate the token, and update it if it is expired
+        :return:
+        """
         if self.token_info is None or self.token_expired():
             with self.auth_lock:
                 if self.token_info is None or self.token_expired():
@@ -156,6 +167,12 @@ class SpotifySearcher:
         return None
 
     def _get_item(self, endpoint: str, **params):
+        """
+        Get an item from the Spotify API using http parameters
+        :param endpoint:
+        :param params:
+        :return:
+        """
         self.validate_token()
         with self.semaphores[endpoint]:
             response = self.session.get(f'https://api.spotify.com/v1/{endpoint}', params=params, timeout=20)
@@ -168,6 +185,12 @@ class SpotifySearcher:
             return response.json()
 
     def _get_item_base(self, endpoint: str, value):
+        """
+        Get an item from the Spotify API but using path parameters
+        :param endpoint:
+        :param value:
+        :return:
+        """
         self.validate_token()
         with self.semaphores[endpoint]:
             response = self.session.get(f"https://api.spotify.com/v1/{endpoint}/{value}", timeout=20)
@@ -192,6 +215,11 @@ class SpotifySearcher:
         return False
 
     def _get_track_info(self, item: dict) -> Track:
+        """
+        Get optional additional metadata from Spotify
+        :param item:
+        :return:
+        """
         logging.debug("Searching additional metadata")
         try:
             audio = self._get_item_base('audio-analysis', item["id"])

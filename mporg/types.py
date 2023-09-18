@@ -13,6 +13,9 @@ from mutagen.wave import WAVE
 
 @dataclass(frozen=True)
 class Track:
+    """
+    Dataclass for storing track information
+    """
     track_name: str = None
     track_number: int = None
     track_year: str = None

@@ -41,6 +41,11 @@ default_plugin_urls = {
 
 
 def get_plugin_info(url: str):
+    """
+    Get the plugin info from the plugin.json file
+    :param url:  URL to the plugin.json file
+    :return:
+    """
     resp = requests.get(url)
     resp.raise_for_status()
     content = resp.json()
@@ -105,6 +110,11 @@ def install_plugin_modules(plugin: PluginInfo):
 
 
 def install_plugin(source: str):
+    """
+    Install a plugin from a URL
+    :param source: URL to the plugin.json file
+    :return bool:  True if the plugin was installed successfully, False if the plugin was not installed
+    """
     plugin = get_plugin_info(source)
     logging.info(f"Installing plugin: {plugin.name}")
     if plugin.readme:
@@ -124,6 +134,11 @@ def install_plugin(source: str):
 
 
 def delete_plugin(plugin_dir: Path):
+    """
+    Delete a plugin directory
+    :param plugin_dir:
+    :return:
+    """
     try:
         if plugin_dir.exists():
             if plugin_dir.is_file():

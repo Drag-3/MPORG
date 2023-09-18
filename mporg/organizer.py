@@ -127,6 +127,9 @@ def save_metadata(tagger: Tagger):
 
 
 class MPORG:
+    """
+    Main class for organizing files
+    """
     def __init__(
         self,
         store: Path,
@@ -147,6 +150,11 @@ class MPORG:
         self.lyric_semaphore = threading.Semaphore(5)
 
     def process_file(self, args):
+        """
+        Process a single file
+        :param args:  Tuple of root and file
+        :return str:  Error Messages
+        """
         root, file = args
         try:
             logging.info(f"Organizing: {str(root / file)}")
@@ -185,6 +193,10 @@ class MPORG:
             return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
+        """
+        Organize all files in the search directory
+        :return:
+        """
         logging.top("Organizing files...")
         file_count = get_file_count(self.search)
 

@@ -29,7 +29,7 @@ class MBFingerprinter(Fingerprinter):
             logging.info(f"Using cached result for {path_to_fingerprint}")
             return cached_result
         try:
-            logging.info(f"Starting fingerprintng for {path_to_fingerprint}")
+            logging.info(f"Starting fingerprinting for {path_to_fingerprint}")
             duration, fingerprint = fingerprint_file(str(path_to_fingerprint))
             api_result = lookup(self.api_key, fingerprint, duration, meta='recordings')
         except FingerprintGenerationError as e:
@@ -188,7 +188,7 @@ class AcoustIDCredentialProvider(CredentialProvider):
         try:
             response = requests.get(url, params=params)
             data = response.json()
-            if data.get('code') != 4:
+            if data.get('code') != 4:  # Code 4 is invalid api key
                 logging.top("AcoustID credentials are valid.")
                 return True
         except requests.exceptions.RequestException as e:

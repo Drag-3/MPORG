@@ -11,12 +11,20 @@ logging.propagate = True
 
 
 class CredentialProvider:
+    """
+    CredentialProvider is an abstract class that defines the interface for credential providers.
+    """
     SPEC = {}
 
     def __init__(self, credential_file):
         self.credential_file = credential_file
 
     def verify_spec(self, credentials):
+        """
+        Verify that the credentials match the specification.
+        :param credentials:
+        :return:
+        """
         for key, value in self.SPEC.items():
             if not value(credentials.get(key, "")):
                 logging.warning(f"Invalid {key}.")
@@ -24,12 +32,21 @@ class CredentialProvider:
         return True
 
     def verify_credentials(self, credentials):
+        """
+        Verify that the credentials are valid.
+        :param credentials:
+        :return:
+        """
         raise NotImplementedError(
             "Subclasses must implement verify_credentials(), Return True if verification "
-            "impossible"
+            "impossible or unnecessary."
         )
 
     def _load_from_file(self):
+        """
+        Load credentials from file.
+        :return:
+        """
         data = {}
         try:
             with open(self.credential_file, "r+", encoding="utf-8") as cred:
@@ -42,15 +59,24 @@ class CredentialProvider:
         return data
 
     def get_credentials(self):
+        """
+        Get credentials from the user.
+        :return:
+        """
         raise NotImplementedError("Subclasses must implement get_credentials()")
 
     def store_credentials(self, credentials):
+        """
+        Store credentials to file.
+        :param credentials:
+        :return:
+        """
         with open(self.credential_file, "w", encoding="utf-8") as file:
             json.dump(credentials, file)
 
 
 class SpotifyCredentialProvider(CredentialProvider):
-    SPEC = {"cid": lambda x: len(x) > 0, "secret": lambda x: len(x) > 0}
+    SPEC = {"cid": lambda x: len(x) > 0, "secret": lambda x: len(x) > 0} # cid = client id, secret = client secret
     PNAME = "Spotify"
 
     def get_credentials(self):
@@ -99,9 +125,9 @@ class SpotifyCredentialProvider(CredentialProvider):
 
 class ACRCloudCredentialProvider(CredentialProvider):
     SPEC = {
-        "host": lambda x: ".acrcloud.com" in x,
-        "access_key": lambda x: len(x) > 0,
-        "access_secret": lambda x: len(x) > 0,
+        "host": lambda x: ".acrcloud.com" in x,  # host must contain .acrcloud.com
+        "access_key": lambda x: len(x) > 0,  # access_key must not be empty
+        "access_secret": lambda x: len(x) > 0,  # access_secret must not be empty
     }
     PNAME = "ACRCloud"
 
@@ -149,8 +175,8 @@ class ACRCloudCredentialProvider(CredentialProvider):
         recognizer = ACRCloudRecognizer(config)
 
         try:
-            # Use a dummy fingerprint
-            dummy_fingerprint = {"sample": b"A"}
+            #
+            dummy_fingerprint = {"sample": b"A"}  #Use a dummy fingerprint because ACRCloud requires a sample
 
             # Use the do_recogize() method to verify credentials
             result = recognizer.do_recogize(
@@ -165,7 +191,7 @@ class ACRCloudCredentialProvider(CredentialProvider):
             result = json.loads(result)
             if (
                 result["status"]["code"] == 1001
-                and result["status"]["msg"] == "No result"
+                and result["status"]["msg"] == "No result"  # The key and secret are valid if the result is "No result"
             ):
                 logging.top("ACRCloud credentials are valid.")
                 return True

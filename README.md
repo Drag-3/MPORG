@@ -75,6 +75,12 @@ You can specify the following command line options to customize the behavior of 
 - `-y`, `--lyrics`: Attempt to get lyrics and store with file.
 - `--install-plugins`: Install specified plugins, space separated.
 
+*Note*: The `--all_fingerprint` and `--fingerprint` options are mutually exclusive. If both are specified, the `--all_fingerprint` option will be used.
+*Note*: Separate optional arguments from positional arguments with `--`. For example:
+```bash
+mporg -l 2 -af -- /path/to/store /path/to/search
+```
+
 ### Examples
 - To run MPORG with a specific store path and search path:
   ```bash
@@ -86,7 +92,7 @@ You can specify the following command line options to customize the behavior of 
   mporg -l 2 -af
   ```
   ```bash
-  mporg Music Downloads -f MB l 1 -p flac oga wma -y
+  mporg -f MB l 1 -p flac oga wma -y -- "C:\Users\Me\Music\Downloaded_New" "C:\Users\Me\Music\My Music\Library"
   ```
   
 
@@ -126,7 +132,7 @@ The `plugin.json` file is used to describe your plugin. It contains the followin
 - `type`: The type of plugin. Currently, only `FingerprinterPlugin` is supported.
 - `dependencies`: A list of dependencies required for your plugin to function. This is a list of strings. And it can include git URLs, PyPI package names, and local file paths.
 - `modules`: A list of modules to import. This is a list of dicts. One of these must be the entry point for your plugin. Each dict must contain a `name` field and an `url` field. The `name` field is the desired filename of the module. The `url` field is the URL to the module. This will be a direct url to the file. For example, if you are hosting your plugin on GitHub, the URL will be in the format `https://raw.githubusercontent.com/<username>/<repo>/<branch>/<path/to/file>`. The `name` field will be the filename of the file at the end of the URL. For example, if the URL is `https://raw.githubusercontent.com/Drag-3/MPORG/main/mporg/plugins/acrcloud/ACRCloudPlugin.py`, the `name` field will be `ACRCloudPlugin.py`.
-- `readme`: An optional URL to a README file for your plugin. This will be displayed to the user when they install your plugin.
+- `readme`: An optional URL to a README file for your plugin. This will be displayed to the user when they install your plugin. In the README information about non python dependencies should be included. In order for the user to install them before plugin installation. 
 
 ##### Example
 ```json
