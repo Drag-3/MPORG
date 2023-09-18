@@ -170,7 +170,7 @@ class ACRCloudCredentialProvider(CredentialProvider):
                 return True
             else:
                 logging.warning(
-                    "ACRCloud credentials are invalid:", result["status"]["msg"]
+                    f"ACRCloud credentials are invalid: {result['status']['msg']}"
                 )
                 return False
         except Exception as e:
