@@ -36,7 +36,7 @@ class PluginType(Enum):
 
 default_plugin_urls = {
     PluginType.FINGERPRINTER: "https://raw.githubusercontent.com/"
-                              "Drag-3/MPORG/dev/plugins/plugins/FingerprinterPlugins/MBFingerprinter/plugin.json",
+                              "Drag-3/MPORG/master/plugins/FingerprinterPlugins/MBFingerprinter/plugin.json",
 }
 
 
