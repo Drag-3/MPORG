@@ -33,6 +33,24 @@ class Track:
     album_id: str = None
 
 
+def register_comment(lang='\0\0\0', desc='', name='comment'):
+    "Register the comment tag"
+    frameid = ':'.join(('COMM', desc, lang))
+
+    def getter(id3, _key):
+        frame = id3.get(frameid)
+        return None if frame is None else list(frame)
+
+    def setter(id3, _key, value):
+        id3.add(mutagen.id3.COMM(
+            encoding=3, lang=lang, desc=desc, text=value))
+
+    def deleter(id3, _key):
+        del id3[frameid]
+
+    EasyID3.RegisterKey(name, getter, setter, deleter)
+
+
 class Tagger:
     """
     Wrapper class for mutagen objects, to provide consistent api for any filetype
@@ -41,7 +59,9 @@ class Tagger:
 
     def __init__(self, file: Path):
         # Register Non-Standard Keys for Easy
-        register_comment()
+        register_comment('\0\0\0', name='commentNULL')  # Sunk cost since I already have a bunch of these
+        register_comment('XXX', name='comment')  # Standard for non-language specific comments
+        register_comment('eng', name='commentENG')  # English Comment
         EasyID3.RegisterTextKey("initialkey", "TKEY")
         EasyID3.RegisterTextKey("source", "WOAS")
         EasyMP4.RegisterTextKey("source", "source")
@@ -83,6 +103,7 @@ class Tagger:
         return result
 
     def __getitem__(self, item):
+
         result = self.tagger.__getitem__(item)
         if self.extension.lower() == ".wma":
             if isinstance(result, list):
@@ -103,20 +124,8 @@ class Tagger:
     def save(self):
         self.tagger.save()
 
+    def pop(self, key):
+        self.tagger.pop(key)
 
-def register_comment(lang='\0\0\0', desc=''):
-    """Register the comment tag"""
-    frame_id = ':'.join(('COMM', desc, lang))
-
-    def getter(id3, _key):
-        frame = id3.get(frame_id)
-        return None if frame is None else list(frame)
-
-    def setter(id3, _key, value):
-        id3.add(mutagen.id3.COMM(
-            encoding=3, lang=lang, desc=desc, text=value))
-
-    def deleter(id3, _key):
-        del id3[frame_id]
-
-    EasyID3.RegisterKey('comment', getter, setter, deleter)
+    def __str__(self):
+        return str(self.tagger)

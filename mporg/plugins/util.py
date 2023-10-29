@@ -1,3 +1,4 @@
+import json
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
@@ -22,7 +23,7 @@ class Plugin:
 class PluginInfo:
     name: str
     type: str
-    dependancies: list[str]
+    dependencies: list[str]
     modules: list[{str, str}]
     dir: Path
     readme: bool = False
@@ -54,7 +55,7 @@ def get_plugin_info(url: str):
     name = content.get("name")
     plugin_type = content.get("type") + "s"
     readme_url = content.get("readme")
-    dependancies = content.get("dependencies")
+    dependencies = content.get("dependencies")
     modules = content.get("modules")
 
     plugin_dir = get_plugin_dir(PluginType(plugin_type), name)
@@ -70,7 +71,7 @@ def get_plugin_info(url: str):
         with open(plugin_dir / "README.md", "w") as f:
             f.write(requests.get(readme_url).text)
 
-    return PluginInfo(name, plugin_type, dependancies, modules, plugin_dir, readme_url is not None)
+    return PluginInfo(name, plugin_type, dependencies, modules, plugin_dir, readme_url is not None)
 
 
 def install_plugin_dependencies(plugin: PluginInfo):
@@ -80,7 +81,7 @@ def install_plugin_dependencies(plugin: PluginInfo):
     :return:
     """
     logging.info(f"Installing dependencies for {plugin.name}")
-    for package in plugin.dependancies:
+    for package in plugin.dependencies:
         ret = subprocess.run(["pip", "install", package]).returncode
         if ret != 0:
             logging.error(f"Error installing {package}")
@@ -123,7 +124,8 @@ def install_plugin(source: str):
         logging.info(f"Installing plugin: {plugin.name}")
         if plugin.readme:
             display_markdown(plugin.dir / "README.md")
-            rich.print(f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue, or any other key to cancel")
+            rich.print(
+                f"Please read the README.md file for {plugin.name} and install any dependencies before continuing. [Enter] to continue, or any other key to cancel")
             user_quit = input()
             if user_quit:
                 # Installation is Aborted!
@@ -220,11 +222,27 @@ def setup_and_check_plugins():
     logging.info("Default plugins verified.")
 
 
-def display_markdown(md_file: Path):
+def get_installed_plugins():
+    """
+    Return an array of installed plugins, and their versions once added
+    :return: list[PluginInfo]
+    """
+    plugins = []
+    for plugin_type in PluginType:
+        for plugin_dir in PLUGIN_DIR.glob(f"{plugin_type.value}/*"):
+            plugin_json_file = plugin_dir / "plugin.json"
+            if plugin_json_file.exists():
+                with open(plugin_json_file, "r") as f:
+                    plugin_json = json.loads(f.read())
+                    plugins.append(PluginInfo(**plugin_json, dir=plugin_dir))
+    return plugins
 
+
+def display_markdown(md_file: Path):
     with open(md_file, 'r', encoding='utf-8') as file:
         console = rich.get_console()
         console.print(Markdown(file.read()))
+
 
 # TODO: Provide a way to diplay an plugin's Version, and automatically check for updates
 # When installing a plugin, it will check if the plugin is already installed, and if so, check if the version is the same.
@@ -232,4 +250,5 @@ def display_markdown(md_file: Path):
 
 
 if __name__ == "__main__":
-    display_markdown("/home/justin/PycharmProjects/MP3ORG/plugins/FingerprinterPlugins/MBFingerprinter/README.md")
+    # display_markdown("/home/justin/PycharmProjects/MP3ORG/plugins/FingerprinterPlugins/MBFingerprinter/README.md")
+    print(get_installed_plugins())

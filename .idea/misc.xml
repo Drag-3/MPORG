@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Black">
-    <option name="enabledOnReformat" value="true" />
-    <option name="sdkUUID" value="0fd30aea-1fb9-496c-b858-437bb5a2ed57" />
+    <option name="sdkName" value="Python 3.11 (MP3ORG)" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (MP3ORG)" project-jdk-type="Python SDK" />
 </project>

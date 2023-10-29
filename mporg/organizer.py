@@ -228,11 +228,10 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        comment = metadata.get("comment")
-        source = metadata.get("source")
-        url = metadata.get("url")
+        url_locs = [a for a in
+                    (metadata['comment'], metadata['commentNULL'], metadata['commentENG'], metadata['source'], metadata['url'])]
 
-        if spot_id := get_valid_spotify_url((comment, source, url)):
+        if spot_id := get_valid_spotify_url(url_locs):
             logging.info(f"A spotify Url was found in {file} metadata. Searching via id")
             spotify_results = self.get_fingerprint_spotify_metadata(spot_id)
             return spotify_results, TagType.SPOTIFY
