@@ -4,10 +4,10 @@ diskcache~=5.6.3
 mutagen~=1.47.0
 #pyacoustid~=1.3.0
 requests~=2.31.0
-urllib3~=2.0.4
+urllib3==2.1.0
 LyricsSearcher @ git+https://github.com/Drag-3/LyricsSearcher.git
 tqdm~=4.66.1
-rich~=13.5.3
+rich==13.7.0
 # Linux requirements
 #pyacrcloud~=1.0.1; sys_platform == 'linux'
 

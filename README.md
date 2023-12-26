@@ -212,4 +212,4 @@ MPORG was created by Drag (Justin Erysthee).
 MPORG is licensed under the GPL-3.0 license.
 
 
-*This README is applicable for version 0.2a2.*
+*This README is applicable for version 0.2a3.*

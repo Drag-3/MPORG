@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2a3] - 2023-12-26
+### Added
+- **Update to Tagger for COMM Languages**: Tagger now searches COMM fields with additional language values: "XXX", "\0\0\0", and "eng".
+
+### Changed
+- **MPORG Language Standardization**: MPORG will now save comment tags using "XXX" by default, aligning with the standard for non-language-specific comments. This is a non-breaking change as the Tagger still reads old "\0\0\0" tags.
+- **Update to `plugin.json` Files**: Introduced a "version" field in `plugin.json` files. The program will now compare the installed plugin version with the remote version upon execution, notifying users of any changes.
+
+### Fixed
+- **README.md Update**: Updated `README.md` to reflect the new "version" field in `plugin.json` files.
+- **File Organization Robustness**: Addressed an issue in `organizer.py` where the absence of a comment field could halt the file organization process.
+
+### Maintenance
+- **Recommendation for URL Comments**: Advised the deletion of old URL comments to prevent confusion with apps that might be distracted by the presence of multiple comment formats.
+
+### Known Bugs
+- No new bugs reported.
+
 ## [0.2a2] - 2023-09-18
 ### Added
 - Nada
