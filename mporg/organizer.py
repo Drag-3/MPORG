@@ -189,7 +189,7 @@ class MPORG:
             # logging.exception(e)
             return f"Error processing file {file}: {e}"
         except Exception as e:
-            # logging.exception(e)
+            logging.exception(e)
             return f"Unknown Exception processing file {os.path.join(root, file)}\n EXP {e}"
 
     def organize(self):
@@ -228,8 +228,9 @@ class MPORG:
         :param file: Path of origin file
         :return: Tuple of metadata results and the source of the metadata
         """
-        url_locs = [a for a in
-                    (metadata['comment'], metadata['commentNULL'], metadata['commentENG'], metadata['source'], metadata['url'])]
+        url_locs = []
+        for url in (metadata.get("comment"), metadata.get("commentNULL"), metadata.get("commentENG"), metadata.get("source"), metadata.get("url")):
+            url_locs.append(url)
 
         if spot_id := get_valid_spotify_url(url_locs):
             logging.info(f"A spotify Url was found in {file} metadata. Searching via id")

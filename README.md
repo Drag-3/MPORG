@@ -136,6 +136,7 @@ The `plugin.json` file is used to describe your plugin. It contains the followin
 {
     "name": "MyFingerprintPlugin",
     "type": "FingerprinterPlugin",
+    "version": "1.0.0",
     "dependencies": ["dependency1", "dependency2"],
     "readme": "https://github.com/user/my-fingerprint-plugin/raw/main/README.md",
     "modules": [

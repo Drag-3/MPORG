@@ -15,7 +15,9 @@ class MockTagger(mporg.types.Tagger):
         return self._fake_mutagen.get(key, value)
 
     def __getitem__(self, item):
-        return self._fake_mutagen.__getitem__(item)
+        if item in self._fake_mutagen:
+            return self._fake_mutagen[item]
+        return "XXX"
 
     def __setitem__(self, key, value):
         self._fake_mutagen.__setitem__(key, value)
