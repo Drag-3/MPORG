@@ -246,5 +246,6 @@ class SpotifySearcher:
             album_artists=tuple([artist['name'] for artist in item['album']['artists']]),
             album_genres=";".join(genres),
 
-            track_url=item['external_urls']['spotify']
+            track_url=item['external_urls']['spotify'],
+            track_image=item['album']['images'][0]['url'],
         )

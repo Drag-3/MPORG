@@ -451,24 +451,27 @@ class MPORG:
         except Exception as e:
             logging.exception(f"Error getting metadata for update {e} ")
             raise e
-        metadata["title"] = results.track_name
-        metadata["artist"] = ";".join(results.track_artists)
-        metadata["album"] = results.album_name
-        metadata["date"] = results.album_year
-        metadata["tracknumber"] = str(results.track_number)
-        metadata["discnumber"] = str(results.track_disk)
-        metadata["comment"] = results.track_url
-        metadata["source"] = results.track_url
-        metadata["albumartist"] = ";".join(results.album_artists)
+        metadata.set("title", results.track_name)
+        metadata.set("artist", results.track_artists)
+        metadata.set("album", results.album_name)
+        metadata.set("date", results.album_year)
+        metadata.set("tracknumber", str(results.track_number))
+        metadata.set("comment", results.track_url, lang="XXX", desc="Spotify URL")
+        metadata.set("source", results.track_url)
+        metadata.set("albumartist", results.album_artists)
         try:
-            metadata["bpm"] = str(int(results.track_bpm))
+            metadata.set("bpm", results.track_bpm)
         except TypeError:
             pass
         try:
-            metadata["initialkey"] = results.track_key
+            metadata.set("initialkey", results.track_key)
         except TypeError:
             pass
-        metadata["genre"] = results.album_genres
+
+        metadata.set("genre", results.album_genres)
+
+        # TODO: Add album art for all types
+
 
         save_metadata(metadata)
 
@@ -488,19 +491,19 @@ class MPORG:
         except Exception as e:
             logging.exception(f"Error getting metadata for update {e} ")
             raise e
-        metadata["title"] = results.track_name
-        metadata["artist"] = ";".join(results.track_artists)
-        metadata["albumartist"] = ";".join(results.album_artists)
+        metadata.set("title", results.track_name)
+        metadata.set("artist", results.track_artists)
+        metadata.set("albumartist", results.album_artists)
         try:
-            metadata["album"] = results.album_name
+            metadata.set("album", results.album_name)
         except ValueError:
             pass
         try:
-            metadata["date"] = results.track_year
+            metadata.set("date", results.album_year)
         except ValueError:
             pass
         try:
-            metadata["genre"] = results.album_genres
+            metadata.set("tracknumber", str(results.track_number))
         except ValueError:
             pass
 
