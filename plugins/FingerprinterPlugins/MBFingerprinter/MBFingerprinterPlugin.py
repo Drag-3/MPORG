@@ -10,7 +10,7 @@ from ftfy import ftfy
 from mporg import CONFIG_DIR, VERSION
 from mporg.audio_fingerprinter import Fingerprinter, FingerprintResult
 from mporg.credentials.providers import CredentialProvider
-from mporg.types import Track
+from mporg.models import Track
 
 
 class MBFingerprinter(Fingerprinter):
